@@ -1,3 +1,5 @@
+; COE538 Final Project -- eebot Maze Robot
+; By: Adrian Omoruyi, Rose Panago
 ;*****************************************************************
 ;* This stationery serves as the framework for a                 *
 ;* user application (single file, absolute assembly application) *
@@ -9,31 +11,90 @@
 ;*****************************************************************
 
 ; export symbols
-            XDEF Entry, _Startup            ; export 'Entry' symbol
-            ABSENTRY Entry        ; for absolute assembly: mark this as application entry point
-
-
-
+            XDEF Entry, _Startup          ; export 'Entry' symbol
+            ABSENTRY Entry                ; for absolute assembly: mark this as application entry point
+            
 ; Include derivative-specific definitions 
-		INCLUDE 'derivative.inc' 
+		        INCLUDE 'derivative.inc' 
 
-ROMStart    EQU  $4000  ; absolute address to place my code/constant data
+;***************************************************************************************************
+; equates section
+;***************************************************************************************************
+
+; Liquid Crystal Display Equates
+;-------------------------------
+CLEAR_HOME    EQU   $01                   ; Clear the display and home the cursor
+INTERFACE     EQU   $38                   ; 8 bit interface, two line display
+CURSOR_OFF    EQU   $0C                   ; Display on, cursor off
+SHIFT_OFF     EQU   $06                   ; Address increments, no character shift
+LCD_SEC_LINE  EQU   64                    ; Starting addr. of 2nd line of LCD (note decimal value!)
+
+; LCD Addresses
+; -------------
+LCD_CNTR      EQU   PTJ                   ; LCD Control Register: E = PJ7, RS = PJ6
+LCD_DAT       EQU   PORTB                 ; LCD Data Register: D7 = PB7, ... , D0 = PB0
+LCD_E         EQU   $80                   ; LCD E-signal pin
+LCD_RS        EQU   $40                   ; LCD RS-signal pin
+
+; Other codes
+; -----------
+NULL          EQU   00                    ; The string ?null terminator?
+CR            EQU   $0D                   ; ?Carriage Return? character
+SPACE         EQU   ' '                   ; The ?space? character
 
 ; variable/data section
+; ---------------------
+              ORG   $3800
+             
+; ------------------------------------------------------ 
+; Storage Registers (9S12C32 RAM space: $3800 ... $3FFF)
+; ------------------------------------------------------
+SENSOR_LINE   FCB   $01                     ; Storage for guider sensor readings
+SENSOR_BOW    FCB   $23                     ; Initialized to test values
+SENSOR_PORT   FCB   $45
+SENSOR_MID    FCB   $67
+SENSOR_STBD   FCB   $89
+SENSOR_NUM    RMB   1 
 
-            ORG RAMStart
- ; Insert here your data definition.
-Counter     DS.W 1
-FiboRes     DS.W 1
+TOP_LINE      RMB   20                      ; Top line of display
+              FCB   NULL                    ; terminated by null
+              
+BOT_LINE      RMB   20                      ; Bottom line of display
+              FCB   NULL                    ; terminated by null
+
+CLEAR_LINE    FCC   '                  '    ; Clear the line of display
+              FCB   NULL                    ; terminated by null
+
+TEMP          RMB   1                       ; Temporary location
+
 
 
 ; code section
-            ORG   ROMStart
-
-
-Entry:
+;***************************************************************************************************
+              ORG   $4000                  ; Start of program text in memory
+; Initialization
+             
+Entry:                                                                       
 _Startup:
+
+              LDS   #$4000                 ; Initialize the stack pointer
+              CLI                          ; Enable interrupts
+              JSR   INIT                   ; Initialize ports
+              JSR   openADC                ; Initialize the ATD
+              JSR   initLCD                ; Initialize the LCD
+              JSR   CLR_LCD_BUF            ; Write 'space' characters to the LCD buffer 
+    
+    
+    
             
+MAIN        
+              JSR   G_LEDS_ON              ; Enable the guider LEDs   
+              JSR   READ_SENSORS           ; Read the 5 guider sensors
+              JSR   G_LEDS_OFF             ; Disable the guider LEDs                   
+              JSR   DISPLAY_SENSORS        ; and write them to the LCD
+              LDY   #6000                  ; 300 ms delay to avoid
+              JSR   del_50us               ; display artifacts
+              BRA   MAIN                   ; Loop forever
             
             
     ; utility subroutines
