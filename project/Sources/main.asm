@@ -38,13 +38,24 @@ LCD_RS        EQU   $40                   ; LCD RS-signal pin
 
 ; Other codes
 ; -----------
-NULL          EQU   00                    ; The string ?null terminator?
-CR            EQU   $0D                   ; ?Carriage Return? character
-SPACE         EQU   ' '                   ; The ?space? character
+NULL          EQU   00                    ; The string 'null terminator'
+CR            EQU   $0D                   ; 'Carriage Return' character
+SPACE         EQU   ' '                   ; The 'space' character
 
 ; variable/data section
 ; ---------------------
               ORG   $3800
+             
+TOF_COUNTER   dc.b  0                       ; The timer, incremented at 23Hz
+CRNT_STATE    dc.b  2                       ; Current state register
+T_TURN        ds.b  1                       ; time to stop turning
+TEN_THOUS     ds.b  1                       ; 10,000 digit
+THOUSANDS     ds.b  1                       ; 1,000 digit
+HUNDREDS      ds.b  1                       ; 100 digit
+TENS          ds.b  1                       ; 10 digit
+UNITS         ds.b  1                       ; 1 digit
+NO_BLANK      ds.b  1                       ; Used in 'leading zero' blanking by BCD2ASC
+BCD_SPARE     RMB   2            
              
 ; ------------------------------------------------------ 
 ; Storage Registers (9S12C32 RAM space: $3800 ... $3FFF)
@@ -95,9 +106,173 @@ MAIN
               LDY   #6000                  ; 300 ms delay to avoid
               JSR   del_50us               ; display artifacts
               BRA   MAIN                   ; Loop forever
+
+; data section
+*******************************************************************                        
+msg1        dc.b "Battery volt ",0
+msg2        dc.b "State ",0
+tab         dc.b "START ",0
+            dc.b "FWD ",0
+            dc.b "REV ",0
+            dc.b "ALL_STP",0
+            dc.b "FWD_TRN",0
+            dc.b "REV_TRN",0   
             
-            
-    ; utility subroutines
+; utility subroutines
+    
+;***************************************************************************************************
+;       Initialize Sensors
+INIT              BCLR   DDRAD,$FF ; Make PORTAD an input (DDRAD @ $0272)
+                  BSET   DDRA,$FF  ; Make PORTA an output (DDRA @ $0002)
+                  BSET   DDRB,$FF  ; Make PORTB an output (DDRB @ $0003)
+                  BSET   DDRJ,$C0  ; Make pins 7,6 of PTJ outputs (DDRJ @ $026A)
+                  RTS
+
+
+;***************************************************************************************************
+;        Initialize ADC              
+openADC           MOVB   #$80,ATDCTL2 ; Turn on ADC (ATDCTL2 @ $0082)
+                  LDY    #1           ; Wait for 50 us for ADC to be ready
+                  JSR    del_50us     ; - " -
+                  MOVB   #$20,ATDCTL3 ; 4 conversions on channel AN1 (ATDCTL3 @ $0083)
+                  MOVB   #$97,ATDCTL4 ; 8-bit resolution, prescaler=48 (ATDCTL4 @ $0084)
+                  RTS
+                  
+;***************************************************************************************************
+;                           Clear LCD Buffer
+; This routine writes ?space? characters (ascii 20) into the LCD display
+; buffer in order to prepare it for the building of a new display buffer.
+; This needs only to be done once at the start of the program. Thereafter the
+; display routine should maintain the buffer properly.
+CLR_LCD_BUF       LDX   #CLEAR_LINE
+                  LDY   #TOP_LINE
+                  JSR   STRCPY
+
+CLB_SECOND        LDX   #CLEAR_LINE
+                  LDY   #BOT_LINE
+                  JSR   STRCPY
+
+CLB_EXIT          RTS
+
+;***************************************************************************************************     
+; String Copy
+; Copies a null-terminated string (including the null) from one location to
+; another
+; Passed: X contains starting address of null-terminated string
+; Y contains first address of destination
+STRCPY            PSHX            ; Protect the registers used
+                  PSHY
+                  PSHA
+
+STRCPY_LOOP       LDAA 0,X        ; Get a source character
+                  STAA 0,Y        ; Copy it to the destination
+                  BEQ STRCPY_EXIT ; If it was the null, then exit
+                  INX             ; Else increment the pointers
+                  INY
+                  BRA STRCPY_LOOP ; and do it again
+
+STRCPY_EXIT       PULA            ; Restore the registers
+                  PULY
+                  PULX
+                  RTS  
+ 
+;***************************************************************************************************    
+;                                   Guider LEDs ON                                                 |
+; This routine enables the guider LEDs so that readings of the sensor                              |
+; correspond to the ?illuminated? situation.                                                       |
+; Passed: Nothing                                                                                  |
+; Returns: Nothing                                                                                 |
+; Side: PORTA bit 5 is changed                                                                     |
+G_LEDS_ON         BSET PORTA,%00100000 ; Set bit 5                                                 |
+                  RTS                                                                             ;|
+
+;***************************************************************************************************     
+;                                   Guider LEDs OFF                                                |
+; This routine disables the guider LEDs. Readings of the sensor                                    |
+; correspond to the ?ambient lighting? situation.                                                  |
+; Passed: Nothing                                                                                  |
+; Returns: Nothing                                                                                 |
+; Side: PORTA bit 5 is changed                                                                     |
+G_LEDS_OFF        BCLR PORTA,%00100000 ; Clear bit 5                                               |
+                  RTS                                                                             ;|  
+                  
+                  
+;***************************************************************************************************
+;                               Read Sensors
+
+READ_SENSORS      CLR   SENSOR_NUM     ; Select sensor number 0
+                  LDX   #SENSOR_LINE   ; Point at the start of the sensor array
+
+RS_MAIN_LOOP      LDAA  SENSOR_NUM     ; Select the correct sensor input
+                  JSR   SELECT_SENSOR  ; on the hardware
+                  LDY   #400           ; 20 ms delay to allow the
+                  JSR   del_50us       ; sensor to stabilize
+                  LDAA  #%10000001     ; Start A/D conversion on AN1
+                  STAA  ATDCTL5
+                  BRCLR ATDSTAT0,$80,* ; Repeat until A/D signals done
+                  LDAA  ATDDR0L        ; A/D conversion is complete in ATDDR0L
+                  STAA  0,X            ; so copy it to the sensor register
+                  CPX   #SENSOR_STBD   ; If this is the last reading
+                  BEQ   RS_EXIT        ; Then exit
+                  INC   SENSOR_NUM     ; Else, increment the sensor number
+                  INX                  ; and the pointer into the sensor array
+                  BRA   RS_MAIN_LOOP   ; and do it again
+
+RS_EXIT           RTS
+
+;***************************************************************************************************   
+;                               Select Sensor
+;***************************************************************************************************    
+SELECT_SENSOR     PSHA                ; Save the sensor number for the moment
+                  LDAA PORTA          ; Clear the sensor selection bits to zeros
+                  ANDA #%11100011
+                  STAA TEMP           ; and save it into TEMP
+                  PULA                ; Get the sensor number
+                  ASLA                ; Shift the selection number left, twice
+                  ASLA 
+                  ANDA #%00011100     ; Clear irrelevant bit positions
+                  ORAA TEMP           ; OR it into the sensor bit positions
+                  STAA PORTA          ; Update the hardware
+                  RTS
+                  
+DP_FRONT_SENSOR   EQU TOP_LINE+3
+DP_PORT_SENSOR    EQU BOT_LINE+0
+DP_MID_SENSOR     EQU BOT_LINE+3
+DP_STBD_SENSOR    EQU BOT_LINE+6
+DP_LINE_SENSOR    EQU BOT_LINE+9
+
+DISPLAY_SENSORS   LDAA  SENSOR_BOW        ; Get the FRONT sensor value
+                  JSR   BIN2ASC           ; Convert to ascii string in D
+                  LDX   #DP_FRONT_SENSOR  ; Point to the LCD buffer position
+                  STD   0,X               ; and write the 2 ascii digits there
+                  LDAA  SENSOR_PORT       ; Repeat for the PORT value
+                  JSR   BIN2ASC
+                  LDX   #DP_PORT_SENSOR
+                  STD   0,X
+                  LDAA  SENSOR_MID        ; Repeat for the MID value
+                  JSR   BIN2ASC
+                  LDX   #DP_MID_SENSOR
+                  STD   0,X
+                  LDAA  SENSOR_STBD       ; Repeat for the STARBOARD value
+                  JSR   BIN2ASC
+                  LDX   #DP_STBD_SENSOR
+                  STD   0,X
+                  LDAA  SENSOR_LINE       ; Repeat for the LINE value
+                  JSR   BIN2ASC
+                  LDX   #DP_LINE_SENSOR
+                  STD   0,X
+                  LDAA  #CLEAR_HOME       ; Clear the display and home the cursor
+                  JSR   cmd2LCD           ; "
+                  LDY   #40               ; Wait 2 ms until "clear display" command is complete
+                  JSR   del_50us
+                  LDX   #TOP_LINE         ; Now copy the buffer top line to the LCD
+                  JSR   putsLCD
+                  LDAA  #LCD_SEC_LINE     ; Position the LCD cursor on the second line
+                  JSR   LCD_POS_CRSR
+                  LDX   #BOT_LINE         ; Copy the buffer bottom line to the LCD
+                  JSR   putsLCD
+                  RTS                                     
+                  
 ;*******************************************************************
 ;* Initialization of the LCD
 ;*******************************************************************
@@ -194,29 +369,13 @@ initAD      MOVB #$C0,ATDCTL2 ;power up AD, select fast flag clear
             MOVB #$85,ATDCTL4 ;res=8, conv-clks=2, prescal=12
             BSET ATDDIEN,$0C ;configure pins AN03,AN02 as digital inputs
             RTS
+            
+LCD_POS_CRSR ORAA #%10000000 ; Set the high bit of the control word
+             JSR cmd2LCD ; and set the cursor address
+             RTS            
+            
 ;*****************************************************************
-;*             Integer to BCD Conversion Routine
-;* This routine converts a 16 bit binary number in .D into
-;*  BCD digits in BCD_BUFFER.
-;* Algorithm:
-;*  Because the IDIV (Integer Division) instruction is available on
-;*   the 68HC11, we can determine the decimal digits by repeatedly
-;*   dividing the binary number by ten: the remainder each time is
-;*   a decimal digit. Conceptually, what we are doing is shifting
-;*   the decimal number one place to the right past the decimal
-;*   point with each divide operation. The remainder must be
-;*   a decimal digit between 0 and 9, because we divided by 10.
-;*  The algorithm terminates when the quotient has become zero.
-;*  Bug note: XGDX does not set any condition codes, so test for
-;*   quotient zero must be done explicitly with CPX.
-;* Data structure:
-;* BCD_BUFFER      EQU *  The following registers are the BCD buffer area
-;* TEN_THOUS       RMB 1  10,000 digit, max size for 16 bit binary
-;* THOUSANDS       RMB 1   1,000 digit
-;* HUNDREDS        RMB 1     100 digit
-;* TENS            RMB 1      10 digit
-;* UNITS           RMB 1       1 digit
-;* BCD_SPARE       RMB 2  Extra space for decimal point and string terminator
+;             Integer to BCD Conversion Routine
 ;******************************************************************
 
 int2BCD  XGDX            ;Save the binary number into .X
@@ -272,16 +431,34 @@ int2BCD  XGDX            ;Save the binary number into .X
 *
 CON_EXIT RTS            ;We're done the conversion
 
+;*****************************************************************
+;             Binary to ASCII
+;******************************************************************
+HEX_TABLE             FCC '0123456789ABCDEF' ; Table for converting value
+
+BIN2ASC               PSHA               ; Save a copy of the input number
+                      TAB            
+                      ANDB #%00001111     ; Strip off the upper nibble
+                      CLRA                ; D now contains 000n where n is the LSnibble
+                      ADDD #HEX_TABLE     ; Set up for indexed load
+                      XGDX                
+                      LDAA 0,X            ; Get the LSnibble character
+                      PULB                ; Retrieve the input number into ACCB
+                      PSHA                ; and push the LSnibble character in its place
+                      RORB                ; Move the upper nibble of the input number
+                      RORB                ;  into the lower nibble position.
+                      RORB
+                      RORB 
+                      ANDB #%00001111     ; Strip off the upper nibble
+                      CLRA                ; D now contains 000n where n is the MSnibble 
+                      ADDD #HEX_TABLE     ; Set up for indexed load
+                      XGDX                                                               
+                      LDAA 0,X            ; Get the MSnibble character into ACCA
+                      PULB                ; Retrieve the LSnibble character into ACCB
+                      RTS
            
 ;****************************************************************
-;*               BCD to ASCII Conversion Routine
-;* This routine converts the BCD number in the BCD_BUFFER
-;*  into ascii format, with leading zero suppression.
-;* Leading zeros are converted into space characters.
-;* The flag 'NO_BLANK' starts cleared and is set once a non-zero
-;*  digit has been detected.
-;* The 'units' digit is never blanked, even if it and all the
-;*  preceeding digits are zero.
+;                BCD to ASCII Conversion Routine
 ;****************************************************************
 
 BCD2ASC  LDAA #0         ;Initialize the blanking flag
