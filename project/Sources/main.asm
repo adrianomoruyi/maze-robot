@@ -118,9 +118,140 @@ tab         dc.b "START ",0
             dc.b "FWD_TRN",0
             dc.b "REV_TRN",0   
             
-; utility subroutines
+; dispatcher subroutines
     
 ;***************************************************************************************************
+
+DISPATCHER  CMPA #START       ; If it’s the START state -----------------
+            BNE NOT_START     ;                                          |
+            JSR START_ST      ; then call START_ST routine               D
+            BRA DISP_EXIT     ; and exit                                 I
+                              ;                                          S
+NOT_START   CMPA #FWD         ; 
+            BNE NOT_FWD       ;                                          
+            JSR FWD_ST        ; 
+            BRA DISP_EXIT     ; 
+            
+NOT_FWD     CMPA #REV         ; 
+            BNE NOT_REV       ;                                          
+            JSR REV_ST        ; 
+            BRA DISP_EXIT     ; 
+            
+NOT_REV     CMPA #ALL_STP     ; 
+            BNE NOT_ALL_STP   ;                                          
+            JSR ALL_STP_ST    ; 
+            BRA DISP_EXIT     ; 
+            
+NOT_ALL_STP     CMPA #FWD_TRN     ; 
+            BNE NOT_FWD_TRN   ;                                          
+            JSR FWD_TRN_ST    ; 
+            BRA DISP_EXIT     ; 
+                              ;                                          A
+                              ;                                          T
+NOT_FWD_TRN CMPA #REV_TRN     ; Else if it’s the REV_TRN state           C
+            BNE NOT_REV_TRN   ;                                          H
+            JSR REV_TRN_ST    ; then call REV_TRN_ST routine             E
+            BRA DISP_EXIT     ; and exit                                 R
+                              ;                                          |
+NOT_REV_TRN SWI               ; Else the CRNT_ST is not defined, so stop |
+DISP_EXIT   RTS               ; Exit from the state dispatcher ----------
+
+*******************************************************************
+
+*******************************************************************
+START_ST    BRCLR PORTAD0,$04,NO_FWD          ; If /FWD_BUMP
+            JSR INIT_FWD                          ; Initialize the FORWARD state
+            MOVB #FWD,CRNT_STATE           ; Go into the FORWARD state
+            BRA START_EXIT
+NO_FWD      NOP                                   ; Else
+START_EXIT  RTS                                   ; return to the MAIN routine
+                                 
+*******************************************************************
+FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
+            JSR INIT_REV ; initialize the REVERSE routine
+            MOVB #REV,CRNT_STATE ; set the state to REVERSE
+            JMP FWD_EXIT ; and return
+NO_FWD_BUMP BRSET PORTAD0,$08,NO_REAR_BUMP ; If REAR_BUMP, then we should stop
+            JSR INIT_ALL_STP ; so initialize the ALL_STOP state
+            MOVB #ALL_STP,CRNT_STATE ; and change state to ALL_STOP
+            JMP FWD_EXIT ; and return
+NO_REAR_BUMP LDAA TOF_COUNTER ; If Tc>Tfwd then
+             CMPA T_FWD ; the robot should make a turn
+             BNE NO_FWD_TRN ; so
+             JSR INIT_FWD_TRN ; initialize the FORWARD_TURN state
+             MOVB #FWD_TRN,CRNT_STATE ; and go to that state
+             JMP FWD_EXIT
+
+NO_FWD_TRN  NOP                ; Else
+FWD_EXIT    RTS                ; return to the MAIN routine
+*******************************************************************
+REV_ST      LDAA TOF_COUNTER   ; If Tc>Trev then
+            CMPA T_REV         ; the robot should make a FWD turn
+            BNE NO_REV_TRN     ; so
+            JSR INIT_REV_TRN   ; initialize the REV_TRN state
+            MOVB #REV_TRN,CRNT_STATE ; set state to REV_TRN
+            BRA REV_EXIT       ; and return
+NO_REV_TRN  NOP                ; Else
+REV_EXIT    RTS                ; return to the MAIN routine
+*******************************************************************
+ALL_STP_ST  BRSET PORTAD0,$04,NO_START    ; If FWD_BUMP
+            BCLR PTT,%00110000            ; initialize the START state (both motors off)
+            MOVB #START,CRNT_STATE        ; set the state to START
+            BRA ALL_STP_EXIT              ; and return
+NO_START    NOP                           ; Else
+ALL_STP_EXIT RTS                          ; return to the MAIN routine
+*******************************************************************
+FWD_TRN_ST  LDAA TOF_COUNTER              ; If Tc>Tfwdturn then
+            CMPA T_FWD_TRN                ; the robot should go FWD
+            BNE NO_FWD_FT                 ; so
+            JSR INIT_FWD                  ; initialize the FWD state
+            MOVB #FWD,CRNT_STATE          ; set state to FWD
+            BRA FWD_TRN_EXIT              ; and return
+NO_FWD_FT   NOP                             ; Else
+FWD_TRN_EXIT RTS                          ; return to the MAIN routine
+*******************************************************************
+REV_TRN_ST LDAA TOF_COUNTER               ; If Tc>Trevturn then
+            CMPA T_REV_TRN                ; the robot should go FWD
+            BNE NO_FWD_RT                 ; so
+            JSR INIT_FWD                  ; initialize the FWD state
+            MOVB #FWD,CRNT_STATE          ; set state to FWD
+            BRA REV_TRN_EXIT              ; and return
+NO_FWD_RT NOP                             ; Else
+REV_TRN_EXIT RTS                          ; return to the MAIN routine
+*******************************************************************
+INIT_FWD    BCLR PORTA,%00000011          ; Set FWD direction for both motors
+            BSET PTT,%00110000            ; Turn on the drive motors
+            LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
+            ADDA #FWD_INT
+            STAA T_FWD
+            RTS
+*******************************************************************
+INIT_REV    BSET PORTA,%00000011          ; Set REV direction for both motors
+            BSET PTT,%00110000            ; Turn on the drive motors
+            LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
+            ADDA #REV_INT
+            STAA T_REV
+            RTS
+*******************************************************************
+INIT_ALL_STP BCLR PTT,%00110000           ; Turn off the drive motors
+            RTS
+*******************************************************************
+INIT_FWD_TRN BSET PORTA,%00000010         ; Set REV dir. for STARBOARD (right) motor
+            LDAA TOF_COUNTER              ; Mark the fwd_turn time Tfwdturn
+            ADDA #FWD_TRN_INT
+            STAA T_FWD_TRN
+            RTS
+*******************************************************************
+INIT_REV_TRN BCLR PORTA,%00000010         ; Set FWD dir. for STARBOARD (right) motor
+            LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
+            ADDA #REV_TRN_INT
+            STAA T_REV_TRN
+            RTS
+
+
+; utility subroutines
+*******************************************************************
+
 ;       Initialize Sensors
 INIT              BCLR   DDRAD,$FF ; Make PORTAD an input (DDRAD @ $0272)
                   BSET   DDRA,$FF  ; Make PORTA an output (DDRA @ $0002)
