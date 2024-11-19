@@ -21,14 +21,14 @@
 ; equates section
 ;***************************************************************************************************
 
-; State Machine Equates
+; State Machine Equates                                                                               
 ;-------------------------------
 
 FWD_INT     EQU 69 ; 3 second delay (at 23Hz)
-REV_INT     EQU 69 ; 3 second delay (at 23Hz)
+REV_INT     EQU 46 ; 3 second delay (at 23Hz)
 LEFT_TRN_INT EQU 46 ; 2 second delay (at 23Hz)
 RIGHT_TRN_INT EQU 46 ; 2 second delay (at 23Hz
-REV_TRN_INT EQU 46 ; 2 second delay (at 23Hz)
+REV_TRN_INT EQU 23 ; 2 second delay (at 23Hz)
 START       EQU 0
 FWD         EQU 1
 REV         EQU 2
@@ -65,7 +65,7 @@ SPACE         EQU   ' '                   ; The 'space' character
               ORG   $3800
              
 TOF_COUNTER   dc.b  0                       ; The timer, incremented at 23Hz
-CRNT_STATE    dc.b  2                       ; Current state register
+CRNT_STATE    dc.b  3                       ; Current state register
 T_TURN        ds.b  1                       ; time to stop turning
 TEN_THOUS     ds.b  1                       ; 10,000 digit
 THOUSANDS     ds.b  1                       ; 1,000 digit
@@ -140,7 +140,7 @@ MAIN
                
                
                
-              ;JSR   UPDT_DISPL
+              JSR   UPDT_DISPL
               LDAA  CRNT_STATE                 
               JSR   DISPATCHER 
                
@@ -150,7 +150,7 @@ MAIN
               
                JSR   G_LEDS_OFF             ; Disable the guider LEDs  
                
-               ;JSR   DISPLAY_SENSORS        ; and write them to the LCD
+              ; JSR   DISPLAY_SENSORS        ; and write them to the LCD
                
               ; LDY   #6000                  ; 300 ms delay to avoid
               ; JSR   del_50us               ; display artifacts
@@ -239,16 +239,18 @@ FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
             JSR INIT_REV ; initialize the REVERSE routine
             MOVB #REV,CRNT_STATE ; set the state to REVERSE
             JMP FWD_EXIT ; and return
+            
 NO_FWD_BUMP BRSET PORTAD0,$08,NO_REAR_BUMP ; If REAR_BUMP, then we should stop
             JSR INIT_ALL_STP ; so initialize the ALL_STOP state
             MOVB #ALL_STP,CRNT_STATE ; and change state to ALL_STOP
             JMP FWD_EXIT ; and return
-NO_REAR_BUMP LDAA TOF_COUNTER ; If Tc>Tfwd then
-             CMPA T_FWD ; the robot should make a turn
-             BNE NO_LEFT_TRN ; so
-             JSR INIT_LEFT_TRN ; initialize the FORWARD_TURN state
-             MOVB #LEFT_TRN,CRNT_STATE ; and go to that state
-             JMP FWD_EXIT
+            
+NO_REAR_BUMP ;LDAA TOF_COUNTER ; If Tc>Tfwd then
+             ;CMPA T_FWD ; the robot should make a turn
+             JMP NO_LEFT_TRN ; so
+;             JSR INIT_LEFT_TRN ; initialize the FORWARD_TURN state
+;             MOVB #LEFT_TRN,CRNT_STATE ; and go to that state
+;             JMP FWD_EXIT
 
 NO_FWD_TRN  NOP                ; Else
 FWD_EXIT    RTS                ; return to the MAIN routine
@@ -256,6 +258,7 @@ FWD_EXIT    RTS                ; return to the MAIN routine
 REV_ST      LDAA TOF_COUNTER   ; If Tc>Trev then
             CMPA T_REV         ; the robot should make a FWD turn
             BNE NO_REV_TRN     ; so
+            MOVB #REV_TRN,CRNT_STATE ; set state to REV_TRN
             JSR INIT_REV_TRN   ; initialize the REV_TRN state
             MOVB #REV_TRN,CRNT_STATE ; set state to REV_TRN
             BRA REV_EXIT       ; and return
@@ -290,6 +293,7 @@ RIGHT_TRN_EXIT RTS
 REV_TRN_ST LDAA TOF_COUNTER               ; If Tc>Trevturn then
             CMPA T_REV_TRN                ; the robot should go FWD
             BNE NO_FWD_RT                 ; so
+            MOVB #FWD,CRNT_STATE          ; set state to FWD
             JSR INIT_FWD                  ; initialize the FWD state
             MOVB #FWD,CRNT_STATE          ; set state to FWD
             BRA REV_TRN_EXIT              ; and return
