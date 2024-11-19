@@ -26,7 +26,8 @@
 
 FWD_INT     EQU 69 ; 3 second delay (at 23Hz)
 REV_INT     EQU 69 ; 3 second delay (at 23Hz)
-FWD_TRN_INT EQU 46 ; 2 second delay (at 23Hz)
+LEFT_TRN_INT EQU 46 ; 2 second delay (at 23Hz)
+RIGHT_TRN_INT EQU 46 ; 2 second delay (at 23Hz
 REV_TRN_INT EQU 46 ; 2 second delay (at 23Hz)
 START       EQU 0
 FWD         EQU 1
@@ -75,7 +76,8 @@ NO_BLANK      ds.b  1                       ; Used in 'leading zero' blanking by
 BCD_SPARE     RMB   2        
 T_FWD       ds.b 1 ; FWD time
 T_REV       ds.b 1 ; REV time
-T_FWD_TRN   ds.b 1 ; FWD_TURN time
+T_LEFT_TRN   ds.b 1 ; LEFT_TURN time
+T_RIGHT_TRN   ds.b 1 ; RIGHT_TURN time
 T_REV_TRN   ds.b 1 ; REV_TURN time
 
     
@@ -204,13 +206,13 @@ NOT_LEFT_TRN CMPA #RIGHT_TRN     ; Else if it’s the REV_TRN state           C
             
 NOT_RIGHT_TRN CMPA #LEFT_ALIGN     ; Else if it’s the REV_TRN state           C
             BNE NOT_LEFT_ALIGN   ;                                          H
-            JSR LEFT_ALIGN_ST    ; then call REV_TRN_ST routine             E
+         ;   JSR LEFT_ALIGN_ST    ; then call REV_TRN_ST routine             E
             BRA DISP_EXIT     ; and exit                                 R
             
                         
 NOT_LEFT_ALIGN CMPA #RIGHT_ALIGN     ; Else if it’s the REV_TRN state           C
             BNE NOT_RIGHT_ALIGN   ;                                          H
-            JSR RIGHT_ALIGN_ST    ; then call REV_TRN_ST routine             E
+         ;   JSR RIGHT_ALIGN_ST    ; then call REV_TRN_ST routine             E
             BRA DISP_EXIT     ; and exit                                 R
             
                         
@@ -243,9 +245,9 @@ NO_FWD_BUMP BRSET PORTAD0,$08,NO_REAR_BUMP ; If REAR_BUMP, then we should stop
             JMP FWD_EXIT ; and return
 NO_REAR_BUMP LDAA TOF_COUNTER ; If Tc>Tfwd then
              CMPA T_FWD ; the robot should make a turn
-             BNE NO_FWD_TRN ; so
-             JSR INIT_FWD_TRN ; initialize the FORWARD_TURN state
-             MOVB #FWD_TRN,CRNT_STATE ; and go to that state
+             BNE NO_LEFT_TRN ; so
+             JSR INIT_LEFT_TRN ; initialize the FORWARD_TURN state
+             MOVB #LEFT_TRN,CRNT_STATE ; and go to that state
              JMP FWD_EXIT
 
 NO_FWD_TRN  NOP                ; Else
@@ -267,14 +269,23 @@ ALL_STP_ST  BRSET PORTAD0,$04,NO_START    ; If FWD_BUMP
 NO_START    NOP                           ; Else
 ALL_STP_EXIT RTS                          ; return to the MAIN routine
 *******************************************************************
-FWD_TRN_ST  LDAA TOF_COUNTER              ; If Tc>Tfwdturn then
-            CMPA T_FWD_TRN                ; the robot should go FWD
-            BNE NO_FWD_FT                 ; so
+LEFT_TRN_ST  LDAA TOF_COUNTER              ; If Tc>Tfwdturn then
+            CMPA T_LEFT_TRN                ; the robot should go FWD
+            BNE NO_LEFT_TRN                 ; so
             JSR INIT_FWD                  ; initialize the FWD state
             MOVB #FWD,CRNT_STATE          ; set state to FWD
-            BRA FWD_TRN_EXIT              ; and return
-NO_FWD_FT   NOP                             ; Else
-FWD_TRN_EXIT RTS                          ; return to the MAIN routine
+            BRA LEFT_TRN_EXIT              ; and return
+NO_LEFT_TRN   NOP                             ; Else
+LEFT_TRN_EXIT RTS                          ; return to the MAIN routine
+*******************************************************************
+RIGHT_TRN_ST  LDAA TOF_COUNTER              ; If Tc>Tfwdturn then
+            CMPA T_RIGHT_TRN                ; the robot should go FWD
+            BNE NO_RIGHT_TURN                 ; so
+            JSR INIT_FWD                  ; initialize the FWD state
+            MOVB #FWD,CRNT_STATE          ; set state to FWD
+            BRA RIGHT_TRN_EXIT              ; and return
+NO_RIGHT_TURN   NOP                             ; Else
+RIGHT_TRN_EXIT RTS
 *******************************************************************
 REV_TRN_ST LDAA TOF_COUNTER               ; If Tc>Trevturn then
             CMPA T_REV_TRN                ; the robot should go FWD
@@ -302,10 +313,10 @@ INIT_REV    BSET PORTA,%00000011          ; Set REV direction for both motors
 INIT_ALL_STP BCLR PTT,%00110000           ; Turn off the drive motors
             RTS
 *******************************************************************
-INIT_FWD_TRN BSET PORTA,%00000010         ; Set REV dir. for STARBOARD (right) motor
+INIT_LEFT_TRN BSET PORTA,%00000010         ; Set REV dir. for STARBOARD (right) motor
             LDAA TOF_COUNTER              ; Mark the fwd_turn time Tfwdturn
-            ADDA #FWD_TRN_INT
-            STAA T_FWD_TRN
+            ADDA #LEFT_TRN_INT
+            STAA T_LEFT_TRN
             RTS
 *******************************************************************
 INIT_REV_TRN BCLR PORTA,%00000010         ; Set FWD dir. for STARBOARD (right) motor
