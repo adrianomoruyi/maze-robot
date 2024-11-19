@@ -21,6 +21,23 @@
 ; equates section
 ;***************************************************************************************************
 
+; State Machine Equates
+;-------------------------------
+
+FWD_INT     EQU 69 ; 3 second delay (at 23Hz)
+REV_INT     EQU 69 ; 3 second delay (at 23Hz)
+FWD_TRN_INT EQU 46 ; 2 second delay (at 23Hz)
+REV_TRN_INT EQU 46 ; 2 second delay (at 23Hz)
+START       EQU 0
+FWD         EQU 1
+REV         EQU 2
+ALL_STP     EQU 3
+LEFT_TRN    EQU 4
+RIGHT_TRN   EQU 5
+REV_TRN     EQU 6
+LEFT_ALIGN  EQU 7
+RIGHT_ALIGN EQU 8
+
 ; Liquid Crystal Display Equates
 ;-------------------------------
 CLEAR_HOME    EQU   $01                   ; Clear the display and home the cursor
@@ -55,7 +72,13 @@ HUNDREDS      ds.b  1                       ; 100 digit
 TENS          ds.b  1                       ; 10 digit
 UNITS         ds.b  1                       ; 1 digit
 NO_BLANK      ds.b  1                       ; Used in 'leading zero' blanking by BCD2ASC
-BCD_SPARE     RMB   2            
+BCD_SPARE     RMB   2        
+T_FWD       ds.b 1 ; FWD time
+T_REV       ds.b 1 ; REV time
+T_FWD_TRN   ds.b 1 ; FWD_TURN time
+T_REV_TRN   ds.b 1 ; REV_TURN time
+
+    
              
 ; ------------------------------------------------------ 
 ; Storage Registers (9S12C32 RAM space: $3800 ... $3FFF)
@@ -94,17 +117,43 @@ _Startup:
               JSR   openADC                ; Initialize the ATD
               JSR   initLCD                ; Initialize the LCD
               JSR   CLR_LCD_BUF            ; Write 'space' characters to the LCD buffer 
-    
-    
-    
+              
+              BSET DDRA,%00000011 ; STAR_DIR, PORT_DIR            
+              BSET DDRT,%00110000 ; STAR_SPEED, PORT_SPEED 
+              JSR initAD ; Initialize ATD converter
+              JSR clrLCD ; Clear LCD & home cursor                
+              
+              LDX #msg1 ; Display msg1                            
+              JSR putsLCD ; "                                                                             
+              LDAA #$C0 ; Move LCD cursor to the 2nd row         
+              JSR cmd2LCD                                       
+              LDX #msg2 ; Display msg2                           
+              JSR putsLCD ; "     
+              JSR ENABLE_TOF ; Jump to TOF initialization --------
             
-MAIN        
-              JSR   G_LEDS_ON              ; Enable the guider LEDs   
-              JSR   READ_SENSORS           ; Read the 5 guider sensors
-              JSR   G_LEDS_OFF             ; Disable the guider LEDs                   
-              JSR   DISPLAY_SENSORS        ; and write them to the LCD
-              LDY   #6000                  ; 300 ms delay to avoid
-              JSR   del_50us               ; display artifacts
+               
+            
+MAIN          
+               JSR   G_LEDS_ON              ; Enable the guider LEDs
+               
+               
+               
+              ;JSR   UPDT_DISPL
+              LDAA  CRNT_STATE                 
+              JSR   DISPATCHER 
+               
+               
+               
+               JSR   READ_SENSORS           ; Read the 5 guider sensor
+              
+               JSR   G_LEDS_OFF             ; Disable the guider LEDs  
+               
+               ;JSR   DISPLAY_SENSORS        ; and write them to the LCD
+               
+              ; LDY   #6000                  ; 300 ms delay to avoid
+              ; JSR   del_50us               ; display artifacts
+
+                           
               BRA   MAIN                   ; Loop forever
 
 ; data section
@@ -115,7 +164,8 @@ tab         dc.b "START ",0
             dc.b "FWD ",0
             dc.b "REV ",0
             dc.b "ALL_STP",0
-            dc.b "FWD_TRN",0
+            dc.b "LFT_TRN",0
+            dc.b "RGHT_TRN",0
             dc.b "REV_TRN",0   
             
 ; dispatcher subroutines
@@ -142,13 +192,29 @@ NOT_REV     CMPA #ALL_STP     ;
             JSR ALL_STP_ST    ; 
             BRA DISP_EXIT     ; 
             
-NOT_ALL_STP     CMPA #FWD_TRN     ; 
-            BNE NOT_FWD_TRN   ;                                          
-            JSR FWD_TRN_ST    ; 
+NOT_ALL_STP CMPA #LEFT_TRN     ; 
+            BNE NOT_LEFT_TRN   ;                                          
+            JSR LEFT_TRN_ST    ; 
             BRA DISP_EXIT     ; 
-                              ;                                          A
-                              ;                                          T
-NOT_FWD_TRN CMPA #REV_TRN     ; Else if it’s the REV_TRN state           C
+                              ;                                                                                      
+NOT_LEFT_TRN CMPA #RIGHT_TRN     ; Else if it’s the REV_TRN state           C
+            BNE NOT_RIGHT_TRN   ;                                          H
+            JSR RIGHT_TRN_ST    ; then call REV_TRN_ST routine             E
+            BRA DISP_EXIT     ; and exit                                 R
+            
+NOT_RIGHT_TRN CMPA #LEFT_ALIGN     ; Else if it’s the REV_TRN state           C
+            BNE NOT_LEFT_ALIGN   ;                                          H
+            JSR LEFT_ALIGN_ST    ; then call REV_TRN_ST routine             E
+            BRA DISP_EXIT     ; and exit                                 R
+            
+                        
+NOT_LEFT_ALIGN CMPA #RIGHT_ALIGN     ; Else if it’s the REV_TRN state           C
+            BNE NOT_RIGHT_ALIGN   ;                                          H
+            JSR RIGHT_ALIGN_ST    ; then call REV_TRN_ST routine             E
+            BRA DISP_EXIT     ; and exit                                 R
+            
+                        
+NOT_RIGHT_ALIGN CMPA #REV_TRN     ; Else if it’s the REV_TRN state           C
             BNE NOT_REV_TRN   ;                                          H
             JSR REV_TRN_ST    ; then call REV_TRN_ST routine             E
             BRA DISP_EXIT     ; and exit                                 R
