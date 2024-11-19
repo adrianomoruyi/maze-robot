@@ -64,6 +64,18 @@ SPACE         EQU   ' '                   ; The 'space' character
 ; ---------------------
               ORG   $3800
              
+DEFAULT_LINE   FCB   $85                   
+DEFAULT_BOW    FCB   $D0                    
+DEFAULT_PORT   FCB   $D0
+DEFAULT_MID    FCB   $D0
+DEFAULT_STBD   FCB   $D0
+
+UNCERTAIN_LINE FCB $20
+UNCERTAIN_BOW FCB $20
+UNCERTAIN_PORT FCB $20
+UNCERTAIN_MID FCB $20
+UNCERTAIN_STBD FCB $20             
+             
 TOF_COUNTER   dc.b  0                       ; The timer, incremented at 23Hz
 CRNT_STATE    dc.b  3                       ; Current state register
 T_TURN        ds.b  1                       ; time to stop turning
@@ -226,6 +238,20 @@ DISP_EXIT   RTS               ; Exit from the state dispatcher ----------
 
 *******************************************************************
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 *******************************************************************
 START_ST    BRCLR PORTAD0,$04,NO_FWD          ; If /FWD_BUMP
             JSR INIT_FWD                          ; Initialize the FORWARD state
@@ -236,13 +262,26 @@ START_EXIT  RTS                                   ; return to the MAIN routine
                                  
 *******************************************************************
 FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
-            JSR INIT_REV ; initialize the REVERSE routine
-            MOVB #REV,CRNT_STATE ; set the state to REVERSE
+
+            MOVB #REV_TURN,CRNT_STATE ; set the state to REVERSE
+            JSR UPDT_DISPL
+           ; JSR INIT_REV ; initialize the REVERSE routine
+            
+           ; LDY #6000
+           ; JSR del_50us
+            JSR INIT_REV_TURN
+            
+            LDY #60000
+            JSR del_50us
+            
+            JSR INIT_FWD
+            MOVB #FWD,CRNT_STATE ;
+            
             JMP FWD_EXIT ; and return
             
 NO_FWD_BUMP BRSET PORTAD0,$08,NO_REAR_BUMP ; If REAR_BUMP, then we should stop
-            JSR INIT_ALL_STP ; so initialize the ALL_STOP state
             MOVB #ALL_STP,CRNT_STATE ; and change state to ALL_STOP
+            JSR INIT_ALL_STP ; so initialize the ALL_STOP state
             JMP FWD_EXIT ; and return
             
 NO_REAR_BUMP ;LDAA TOF_COUNTER ; If Tc>Tfwd then
@@ -299,12 +338,26 @@ REV_TRN_ST LDAA TOF_COUNTER               ; If Tc>Trevturn then
             BRA REV_TRN_EXIT              ; and return
 NO_FWD_RT NOP                             ; Else
 REV_TRN_EXIT RTS                          ; return to the MAIN routine
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 *******************************************************************
 INIT_FWD    BCLR PORTA,%00000011          ; Set FWD direction for both motors
             BSET PTT,%00110000            ; Turn on the drive motors
-            LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
-            ADDA #FWD_INT
-            STAA T_FWD
+            ;LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
+            ;ADDA #FWD_INT
+            ;STAA T_FWD
             RTS
 *******************************************************************
 INIT_REV    BSET PORTA,%00000011          ; Set REV direction for both motors
@@ -323,11 +376,21 @@ INIT_LEFT_TRN BSET PORTA,%00000010         ; Set REV dir. for STARBOARD (right) 
             STAA T_LEFT_TRN
             RTS
 *******************************************************************
-INIT_REV_TRN BCLR PORTA,%00000010         ; Set FWD dir. for STARBOARD (right) motor
+INIT_RIGHT_TRN BCLR PORTA,%00000010         ; Set FWD dir. for STARBOARD (right) motor
             LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
             ADDA #REV_TRN_INT
             STAA T_REV_TRN
             RTS
+
+
+
+
+
+
+
+
+
+
 
 
 ; utility subroutines
