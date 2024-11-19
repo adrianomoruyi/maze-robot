@@ -64,11 +64,11 @@ SPACE         EQU   ' '                   ; The 'space' character
 ; ---------------------
               ORG   $3800
              
-DEFAULT_LINE   FCB   $85                   
-DEFAULT_BOW    FCB   $D0                    
-DEFAULT_PORT   FCB   $D0
-DEFAULT_MID    FCB   $D0
-DEFAULT_STBD   FCB   $D0
+DEFAULT_LINE   FCB   $9A                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE SHOULD BE ABOUT THE SAME
+DEFAULT_BOW    FCB   $CE                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE IS ABOUT 40 (give or take) 
+DEFAULT_PORT   FCB   $CE
+DEFAULT_MID    FCB   $CE
+DEFAULT_STBD   FCB   $CE
 
 UNCERTAIN_LINE FCB $20
 UNCERTAIN_BOW FCB $20
@@ -263,15 +263,15 @@ START_EXIT  RTS                                   ; return to the MAIN routine
 *******************************************************************
 FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
 
-            MOVB #REV_TURN,CRNT_STATE ; set the state to REVERSE
+            MOVB #REV_TRN,CRNT_STATE ; set the state to REVERSE
             JSR UPDT_DISPL
            ; JSR INIT_REV ; initialize the REVERSE routine
             
            ; LDY #6000
            ; JSR del_50us
-            JSR INIT_REV_TURN
+            JSR INIT_LEFT_TRN
             
-            LDY #60000
+            LDY #27000
             JSR del_50us
             
             JSR INIT_FWD
@@ -298,7 +298,7 @@ REV_ST      LDAA TOF_COUNTER   ; If Tc>Trev then
             CMPA T_REV         ; the robot should make a FWD turn
             BNE NO_REV_TRN     ; so
             MOVB #REV_TRN,CRNT_STATE ; set state to REV_TRN
-            JSR INIT_REV_TRN   ; initialize the REV_TRN state
+        ;    JSR INIT_REV_TRN   ; initialize the REV_TRN state
             MOVB #REV_TRN,CRNT_STATE ; set state to REV_TRN
             BRA REV_EXIT       ; and return
 NO_REV_TRN  NOP                ; Else
@@ -370,7 +370,7 @@ INIT_REV    BSET PORTA,%00000011          ; Set REV direction for both motors
 INIT_ALL_STP BCLR PTT,%00110000           ; Turn off the drive motors
             RTS
 *******************************************************************
-INIT_LEFT_TRN BSET PORTA,%00000010         ; Set REV dir. for STARBOARD (right) motor
+INIT_LEFT_TRN BSET PORTA,%00000001         ; Set REV dir. for STARBOARD (right) motor
             LDAA TOF_COUNTER              ; Mark the fwd_turn time Tfwdturn
             ADDA #LEFT_TRN_INT
             STAA T_LEFT_TRN
