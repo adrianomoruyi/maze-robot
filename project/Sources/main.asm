@@ -65,6 +65,7 @@ SPACE         EQU   ' '                   ; The 'space' character
               ORG   $3800
              
 DEFAULT_LINE   FCB   $9A                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE SHOULD BE ABOUT THE SAME
+<<<<<<< HEAD
 DEFAULT_BOW    FCB   $CB                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE IS ABOUT 40 (give or take) 
 DEFAULT_PORT   FCB   $CB
 DEFAULT_MID    FCB   $CB
