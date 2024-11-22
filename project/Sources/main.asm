@@ -1,5 +1,5 @@
 ; COE538 Final Project -- eebot Maze Robot
-; By: Adrian Omoruyi, Rose Panago
+; By: Adrian Omoruyi, Rose Pagano
 ;*****************************************************************
 ;* This stationery serves as the framework for a                 *
 ;* user application (single file, absolute assembly application) *
@@ -64,11 +64,11 @@ SPACE         EQU   ' '                   ; The 'space' character
 ; ---------------------
               ORG   $3800
              
-DEFAULT_LINE   FCB   $85                   
-DEFAULT_BOW    FCB   $D0                    
-DEFAULT_PORT   FCB   $D0
-DEFAULT_MID    FCB   $D0
-DEFAULT_STBD   FCB   $D0
+DEFAULT_LINE   FCB   $9A                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE SHOULD BE ABOUT THE SAME
+DEFAULT_BOW    FCB   $CB                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE IS ABOUT 40 (give or take) 
+DEFAULT_PORT   FCB   $CB
+DEFAULT_MID    FCB   $CB
+DEFAULT_STBD   FCB   $CB
 
 UNCERTAIN_LINE FCB $20
 UNCERTAIN_BOW FCB $20
@@ -263,15 +263,15 @@ START_EXIT  RTS                                   ; return to the MAIN routine
 *******************************************************************
 FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
 
-            MOVB #REV_TURN,CRNT_STATE ; set the state to REVERSE
+            MOVB #REV_TRN,CRNT_STATE ; set the state to REVERSE
             JSR UPDT_DISPL
            ; JSR INIT_REV ; initialize the REVERSE routine
             
            ; LDY #6000
            ; JSR del_50us
-            JSR INIT_REV_TURN
+            JSR INIT_LEFT_TRN
             
-            LDY #60000
+            LDY #27000
             JSR del_50us
             
             JSR INIT_FWD
@@ -286,6 +286,21 @@ NO_FWD_BUMP BRSET PORTAD0,$08,NO_REAR_BUMP ; If REAR_BUMP, then we should stop
             
 NO_REAR_BUMP ;LDAA TOF_COUNTER ; If Tc>Tfwd then
              ;CMPA T_FWD ; the robot should make a turn
+             LDAA SENSOR_BOW
+             ADDA UNCERTAIN_BOW
+             CMPA DEFAULT_BOW
+             BPL JUNCTION1
+             
+             LDAA SENSOR_PORT
+             ADDA UNCERTAIN_PORT
+             CMPA DEFAULT_PORT
+             BMI JUNCTION2
+             
+             LDAA SENSOR_STBD
+             ADDA UNCERTAIN_STBD
+             CMPA DEFAULT_STBD
+             BMI JUNCTION3
+             
              JMP NO_LEFT_TRN ; so
 ;             JSR INIT_LEFT_TRN ; initialize the FORWARD_TURN state
 ;             MOVB #LEFT_TRN,CRNT_STATE ; and go to that state
@@ -294,11 +309,32 @@ NO_REAR_BUMP ;LDAA TOF_COUNTER ; If Tc>Tfwd then
 NO_FWD_TRN  NOP                ; Else
 FWD_EXIT    RTS                ; return to the MAIN routine
 *******************************************************************
+JUNCTION1   JSR INIT_LEFT_TRN
+            LDY #13500
+            JSR del_50us
+            JSR INIT_FWD
+            MOVB #FWD,CRNT_STATE 
+            RTS
+            
+JUNCTION2   JSR INIT_RIGHT_TRN
+            LDY #13500
+            JSR del_50us
+            JSR INIT_FWD
+            MOVB #FWD,CRNT_STATE 
+            RTS 
+            
+JUNCTION3   JSR INIT_LEFT_TRN
+            LDY #13500
+            JSR del_50us
+            JSR INIT_FWD
+            MOVB #FWD,CRNT_STATE
+            RTS          
+*******************************************************************
 REV_ST      LDAA TOF_COUNTER   ; If Tc>Trev then
             CMPA T_REV         ; the robot should make a FWD turn
             BNE NO_REV_TRN     ; so
             MOVB #REV_TRN,CRNT_STATE ; set state to REV_TRN
-            JSR INIT_REV_TRN   ; initialize the REV_TRN state
+        ;    JSR INIT_REV_TRN   ; initialize the REV_TRN state
             MOVB #REV_TRN,CRNT_STATE ; set state to REV_TRN
             BRA REV_EXIT       ; and return
 NO_REV_TRN  NOP                ; Else
@@ -370,7 +406,7 @@ INIT_REV    BSET PORTA,%00000011          ; Set REV direction for both motors
 INIT_ALL_STP BCLR PTT,%00110000           ; Turn off the drive motors
             RTS
 *******************************************************************
-INIT_LEFT_TRN BSET PORTA,%00000010         ; Set REV dir. for STARBOARD (right) motor
+INIT_LEFT_TRN BSET PORTA,%00000001         ; Set REV dir. for STARBOARD (right) motor
             LDAA TOF_COUNTER              ; Mark the fwd_turn time Tfwdturn
             ADDA #LEFT_TRN_INT
             STAA T_LEFT_TRN
