@@ -66,7 +66,7 @@ SPACE         EQU   ' '                   ; The 'space' character
              
 DEFAULT_LINE   FCB   $70                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE SHOULD BE ABOUT THE SAME
 DEFAULT_BOW    FCB   $CB                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE IS ABOUT 40 (give or take) 
-DEFAULT_PORT   FCB   $40
+DEFAULT_PORT   FCB   $7D
 DEFAULT_MID    FCB   $CB
 DEFAULT_STBD   FCB   $40
 
@@ -265,16 +265,19 @@ START_EXIT  RTS                                   ; return to the MAIN routine
 *******************************************************************
 FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
 
-            MOVB #REV_TRN,CRNT_STATE ; set the state to REVERSE
-            JSR UPDT_DISPL
+            ;MOVB #REV_TRN,CRNT_STATE ; set the state to REVERSE
+            ;JSR UPDT_DISPL
            ; JSR INIT_REV ; initialize the REVERSE routine
             
            ; LDY #6000
            ; JSR del_50us
             JSR INIT_RIGHT_TRN
             
-            LDY #27080
+            LDY #48080
             JSR del_50us
+            
+            JSR LEFT_TRN_ST
+             
             
             JSR INIT_FWD
             MOVB #FWD,CRNT_STATE ;
@@ -290,12 +293,12 @@ NO_REAR_BUMP
             
             
             
-           ; 
+         
              
             LDAA SENSOR_BOW
             SUBA THRESHOLD_BOW
-            SUBA DEFAULT_STBD
-            BMI TURNING
+            SUBA DEFAULT_BOW
+            BMI CHECK_MID
             
             
             
@@ -329,7 +332,7 @@ NO_REAR_BUMP
             ; CMPA DEFAULT_STBD
             ; BMI JUNCTION3
              
-             JMP NO_LEFT_TRN
+             JMP FWD_EXIT
              
              
 ;             JSR INIT_LEFT_TRN ; initialize the FORWARD_TURN state
@@ -340,20 +343,18 @@ NO_REAR_BUMP
 NO_FWD_TRN  NOP                ; Else
 FWD_EXIT    RTS                ; return to the MAIN routine
 *******************************************************************
-TURNING
-            LDAA DEFAULT_STBD
-            ADDA THRESHOLD_STBD
-            SUBA SENSOR_STBD
-            BMI JUNCTION1
+CHECK_MID
+            LDAA DEFAULT_MID
+            ADDA THRESHOLD_MID
+            SUBA SENSOR_MID
+            BMI CHECK_PORT
             RTS
 
-
-
-
-
-
-
-
+CHECK_PORT  LDAA DEFAULT_PORT
+            ADDA THRESHOLD_PORT
+            SUBA SENSOR_PORT
+            BMI JUNCTION1
+            RTS
 
 
 ADJUSTL     
@@ -371,13 +372,12 @@ ADJUSTR     JSR INIT_RIGHT_TRN
             MOVB #FWD,CRNT_STATE 
             RTS
 
-JUNCTION1   LDY #7200
+JUNCTION1   LDY #9200
             JSR del_50us
-            JSR INIT_RIGHT_TRN
-            LDY #19050
-            JSR del_50us
-            JSR INIT_FWD
-            MOVB #FWD,CRNT_STATE 
+            JSR INIT_LEFT_TRN
+           
+            MOVB #LEFT_TRN,CRNT_STATE
+            ;JSR LEFT_TRN 
             RTS 
             
 JUNCTION2   
@@ -388,14 +388,7 @@ JUNCTION2
             JSR del_50us
             JSR INIT_FWD
             MOVB #FWD,CRNT_STATE 
-            RTS 
-            
-JUNCTION3   JSR INIT_LEFT_TRN
-            LDY #13500
-            JSR del_50us
-            JSR INIT_FWD
-            MOVB #FWD,CRNT_STATE
-            RTS          
+            RTS       
 *******************************************************************
 REV_ST      LDAA TOF_COUNTER   ; If Tc>Trev then
             CMPA T_REV         ; the robot should make a FWD turn
@@ -414,14 +407,20 @@ ALL_STP_ST  BRSET PORTAD0,$04,NO_START    ; If FWD_BUMP
 NO_START    NOP                           ; Else
 ALL_STP_EXIT RTS                          ; return to the MAIN routine
 *******************************************************************
-LEFT_TRN_ST  LDAA TOF_COUNTER              ; If Tc>Tfwdturn then
-            CMPA T_LEFT_TRN                ; the robot should go FWD
-            BNE NO_LEFT_TRN                 ; so
-            JSR INIT_FWD                  ; initialize the FWD state
-            MOVB #FWD,CRNT_STATE          ; set state to FWD
-            BRA LEFT_TRN_EXIT              ; and return
-NO_LEFT_TRN   NOP                             ; Else
-LEFT_TRN_EXIT RTS                          ; return to the MAIN routine
+LEFT_TRN_ST  
+              LDAA SENSOR_BOW
+              SUBA THRESHOLD_BOW
+              SUBA DEFAULT_BOW
+              BMI  CONFIRM_TURN
+              RTS
+
+;NO_LEFT_TRN   NOP 
+                            
+CONFIRM_TURN  MOVB #FWD,CRNT_STATE
+              JSR INIT_FWD
+              RTS
+
+
 *******************************************************************
 RIGHT_TRN_ST  LDAA TOF_COUNTER              ; If Tc>Tfwdturn then
             CMPA T_RIGHT_TRN                ; the robot should go FWD
