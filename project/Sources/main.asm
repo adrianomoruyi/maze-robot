@@ -64,17 +64,17 @@ SPACE         EQU   ' '                   ; The 'space' character
 ; ---------------------
               ORG   $3800
              
-DEFAULT_LINE   FCB   $9A                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE SHOULD BE ABOUT THE SAME
+DEFAULT_LINE   FCB   $70                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE SHOULD BE ABOUT THE SAME
 DEFAULT_BOW    FCB   $CB                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE IS ABOUT 40 (give or take) 
-DEFAULT_PORT   FCB   $CB
+DEFAULT_PORT   FCB   $40
 DEFAULT_MID    FCB   $CB
-DEFAULT_STBD   FCB   $CB
+DEFAULT_STBD   FCB   $40
 
-THRESHOLD_LINE FCB $20
-THRESHOLD_BOW FCB $20
-THRESHOLD_PORT FCB $20
-THRESHOLD_MID FCB $20
-THRESHOLD_STBD FCB $20             
+THRESHOLD_LINE FCB $15
+THRESHOLD_BOW FCB $40
+THRESHOLD_PORT FCB $40
+THRESHOLD_MID FCB $85
+THRESHOLD_STBD FCB $40             
              
 TOF_COUNTER   dc.b  0                       ; The timer, incremented at 23Hz
 CRNT_STATE    dc.b  3                       ; Current state register
@@ -149,7 +149,9 @@ _Startup:
             
 MAIN          
                JSR   G_LEDS_ON              ; Enable the guider LEDs
+               JSR   READ_SENSORS
                
+               JSR   G_LEDS_OFF  
                
                
               JSR   UPDT_DISPL
@@ -158,9 +160,9 @@ MAIN
                
                
                
-               JSR   READ_SENSORS           ; Read the 5 guider sensor
+                          ; Read the 5 guider sensor
               
-               JSR   G_LEDS_OFF             ; Disable the guider LEDs  
+                         ; Disable the guider LEDs  
                
               ; JSR   DISPLAY_SENSORS        ; and write them to the LCD
                
@@ -178,8 +180,8 @@ tab         dc.b "START   ",0
             dc.b "FWD     ",0
             dc.b "REV     ",0
             dc.b "ALL_STP ",0
-            dc.b "LFT_TRN ",0
-            dc.b "RGHT_TRN",0
+            dc.b "LEFT_TRN ",0
+            dc.b "RIGHT_TRN",0
             dc.b "REV_TRN ",0   
             
 ; dispatcher subroutines
@@ -269,9 +271,9 @@ FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
             
            ; LDY #6000
            ; JSR del_50us
-            JSR INIT_LEFT_TRN
+            JSR INIT_RIGHT_TRN
             
-            LDY #27000
+            LDY #27080
             JSR del_50us
             
             JSR INIT_FWD
@@ -286,17 +288,34 @@ NO_FWD_BUMP BRSET PORTAD0,$08,NO_REAR_BUMP ; If REAR_BUMP, then we should stop
             
 NO_REAR_BUMP
             
+            
+            
+           ; 
+             
+            LDAA SENSOR_BOW
+            SUBA THRESHOLD_BOW
+            SUBA DEFAULT_STBD
+            BMI TURNING
+            
+            
+            
+            
+            
             LDAA SENSOR_LINE      ;Load the sensor reading into A
             SUBA DEFAULT_LINE     ;Subtract the default value for the sensor
             SUBA THRESHOLD_LINE   ;Subtract the threshold value
             BPL ADJUSTR           ;If the result is positive, that means the sensor reading increased (past
                                   ;the threshold) and the bot must adjust to the right 
                                   
-            LDAA SENSOR_LINE      ;Load the sensor reading into A
-            SUBA DEFAULT_LINE     ;Subtract the default value for the sensor
-            ADDA THRESHOLD_LINE   ;Add the threshold value
+            LDAA SENSOR_LINE      ;Load the sensor reading into A           
+            ADDA DEFAULT_LINE
+            ADDA THRESHOLD_LINE      ;Subtract the default value for the sensor
             BMI ADJUSTL           ;If the result is negative, that means the sensor reading decreased (past
                                   ;the threshold) and the bot must adjust to the left
+            
+            
+            
+            
             
             
             ; LDAA SENSOR_BOW
@@ -304,17 +323,13 @@ NO_REAR_BUMP
             ; CMPA DEFAULT_BOW
             ; BPL JUNCTION1
              
-            ; LDAA SENSOR_PORT
-            ; ADDA UNCERTAIN_PORT
-            ; CMPA DEFAULT_PORT
-            ; BMI JUNCTION2
-             
+            
             ; LDAA SENSOR_STBD
             ; ADDA UNCERTAIN_STBD
             ; CMPA DEFAULT_STBD
             ; BMI JUNCTION3
              
-            ; JMP NO_LEFT_TRN
+             JMP NO_LEFT_TRN
              
              
 ;             JSR INIT_LEFT_TRN ; initialize the FORWARD_TURN state
@@ -325,29 +340,51 @@ NO_REAR_BUMP
 NO_FWD_TRN  NOP                ; Else
 FWD_EXIT    RTS                ; return to the MAIN routine
 *******************************************************************
-ADJUSTL     JSR INIT_LEFT_TRN
-            LDY #500
+TURNING
+            LDAA DEFAULT_STBD
+            ADDA THRESHOLD_STBD
+            SUBA SENSOR_STBD
+            BMI JUNCTION1
+            RTS
+
+
+
+
+
+
+
+
+
+
+ADJUSTL     
+            JSR INIT_LEFT_TRN
+            LDY #1000
             JSR del_50us
             JSR INIT_FWD
             MOVB #FWD,CRNT_STATE 
             RTS
             
 ADJUSTR     JSR INIT_RIGHT_TRN
-            LDY #500
+            LDY #1000
             JSR del_50us
             JSR INIT_FWD
             MOVB #FWD,CRNT_STATE 
             RTS
 
-JUNCTION1   JSR INIT_LEFT_TRN
-            LDY #13500
+JUNCTION1   LDY #7200
+            JSR del_50us
+            JSR INIT_RIGHT_TRN
+            LDY #19050
             JSR del_50us
             JSR INIT_FWD
             MOVB #FWD,CRNT_STATE 
-            RTS
+            RTS 
             
-JUNCTION2   JSR INIT_RIGHT_TRN
-            LDY #13500
+JUNCTION2   
+            LDY #7200
+            JSR del_50us
+            JSR INIT_LEFT_TRN
+            LDY #13050
             JSR del_50us
             JSR INIT_FWD
             MOVB #FWD,CRNT_STATE 
@@ -437,15 +474,17 @@ INIT_ALL_STP BCLR PTT,%00110000           ; Turn off the drive motors
             RTS
 *******************************************************************
 INIT_LEFT_TRN BSET PORTA,%00000001         ; Set REV dir. for STARBOARD (right) motor
-            LDAA TOF_COUNTER              ; Mark the fwd_turn time Tfwdturn
-            ADDA #LEFT_TRN_INT
-            STAA T_LEFT_TRN
+              BCLR PORTA,%00000010
+           ; LDAA TOF_COUNTER              ; Mark the fwd_turn time Tfwdturn
+           ; ADDA #LEFT_TRN_INT
+           ; STAA T_LEFT_TRN
             RTS
 *******************************************************************
-INIT_RIGHT_TRN BCLR PORTA,%00000010         ; Set FWD dir. for STARBOARD (right) motor
-            LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
-            ADDA #REV_TRN_INT
-            STAA T_REV_TRN
+INIT_RIGHT_TRN BSET PORTA,%00000010         ; Set FWD dir. for STARBOARD (right) motor
+               BCLR PORTA,%00000001
+           ; LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
+           ; ADDA #RIGHT_TRN_INT
+           ; STAA T_RIGHT_TRN
             RTS
 
 
