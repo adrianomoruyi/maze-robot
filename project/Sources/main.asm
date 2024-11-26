@@ -265,7 +265,7 @@ START_EXIT  RTS                                   ; return to the MAIN routine
 *******************************************************************
 FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
 
-            ;MOVB #REV_TRN,CRNT_STATE ; set the state to REVERSE
+            MOVB #REV_TRN,CRNT_STATE ; set the state to REVERSE
             ;JSR UPDT_DISPL
            ; JSR INIT_REV ; initialize the REVERSE routine
             
@@ -273,14 +273,8 @@ FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
            ; JSR del_50us
             JSR INIT_RIGHT_TRN
             
-            LDY #48080
+            LDY #6000
             JSR del_50us
-            
-            JSR LEFT_TRN_ST
-             
-            
-            JSR INIT_FWD
-            MOVB #FWD,CRNT_STATE ;
             
             JMP FWD_EXIT ; and return
             
@@ -374,11 +368,11 @@ ADJUSTR     JSR INIT_RIGHT_TRN
 
 JUNCTION1   LDY #9200
             JSR del_50us
-            JSR INIT_LEFT_TRN
-           
+            JSR INIT_LEFT_TRN        
             MOVB #LEFT_TRN,CRNT_STATE
-            ;JSR LEFT_TRN 
-            RTS 
+            LDY #9200
+            JSR del_50us
+            JMP MAIN 
             
 JUNCTION2   
             LDY #7200
@@ -390,13 +384,13 @@ JUNCTION2
             MOVB #FWD,CRNT_STATE 
             RTS       
 *******************************************************************
-REV_ST      LDAA TOF_COUNTER   ; If Tc>Trev then
-            CMPA T_REV         ; the robot should make a FWD turn
-            BNE NO_REV_TRN     ; so
-            MOVB #REV_TRN,CRNT_STATE ; set state to REV_TRN
-        ;    JSR INIT_REV_TRN   ; initialize the REV_TRN state
-            MOVB #REV_TRN,CRNT_STATE ; set state to REV_TRN
-            BRA REV_EXIT       ; and return
+REV_ST      LDAA SENSOR_BOW
+            SUBA THRESHOLD_BOW
+            SUBA DEFAULT_BOW
+            BPL REV_EXIT   ;MIGHT NEED TO CHANGE TO BMI!!!!!
+            
+            BRA  CONFIRM_TURN
+          
 NO_REV_TRN  NOP                ; Else
 REV_EXIT    RTS                ; return to the MAIN routine
 *******************************************************************
