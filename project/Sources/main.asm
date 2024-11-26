@@ -285,11 +285,11 @@ NO_FWD_BUMP BRSET PORTAD0,$08,NO_REAR_BUMP ; If REAR_BUMP, then we should stop
             
 NO_REAR_BUMP
             
-            ;JSR INIT_ALL_STP   ARTIFICIAL DELAY
+           JSR INIT_ALL_STP  ; ARTIFICIAL DELAY
              
-            ; LDY #1500
-            ; JSR del_50us
-           ; JSR INIT_FWD
+            LDY #1500
+             JSR del_50us
+           JSR INIT_FWD
             
          
              
@@ -412,7 +412,7 @@ JUNCTION2
 REV_ST     ; LDAA SENSOR_BOW
            ; SUBA THRESHOLD_BOW
            ; SUBA DEFAULT_BOW
-           LDY #22000
+           LDY #23000
            JSR del_50us
            
             ;BPL REV_EXIT   ;MIGHT NEED TO CHANGE TO BMI!!!!!
@@ -434,7 +434,7 @@ LEFT_TRN_ST
               ;SUBA THRESHOLD_BOW
               ;SUBA DEFAULT_BOW
               ;BPL  RIGHT_TRN_EXIT 
-               LDY #11500
+               LDY #13500
                JSR del_50us
               
               BRA CONFIRM_TURN
