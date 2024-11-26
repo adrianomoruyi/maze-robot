@@ -5834,7 +5834,7 @@ ADJUSTR     JSR INIT_RIGHT_TRN
             MOVB #FWD,CRNT_STATE 
             RTS
 
-JUNCTION1   LDY #9200
+JUNCTION1   LDY #7900
             JSR del_50us
             JSR INIT_LEFT_TRN        
             MOVB #LEFT_TRN,CRNT_STATE
@@ -5852,10 +5852,13 @@ JUNCTION2
             MOVB #FWD,CRNT_STATE 
             RTS       
 *******************************************************************
-REV_ST      LDAA SENSOR_BOW
-            SUBA THRESHOLD_BOW
-            SUBA DEFAULT_BOW
-            BPL REV_EXIT   ;MIGHT NEED TO CHANGE TO BMI!!!!!
+REV_ST     ; LDAA SENSOR_BOW
+           ; SUBA THRESHOLD_BOW
+           ; SUBA DEFAULT_BOW
+           LDY #23500
+           JSR del_50us
+           
+            ;BPL REV_EXIT   ;MIGHT NEED TO CHANGE TO BMI!!!!!
             
             BRA  CONFIRM_TURN
           
@@ -5870,18 +5873,18 @@ NO_START    NOP                           ; Else
 ALL_STP_EXIT RTS                          ; return to the MAIN routine
 *******************************************************************
 LEFT_TRN_ST  
-              LDAA SENSOR_BOW
-              SUBA THRESHOLD_BOW
-              SUBA DEFAULT_BOW
-              BPL  RIGHT_TRN_EXIT 
+              ;LDAA SENSOR_BOW
+              ;SUBA THRESHOLD_BOW
+              ;SUBA DEFAULT_BOW
+              ;BPL  RIGHT_TRN_EXIT 
+               LDY #13000
+               JSR del_50us
               
               BRA CONFIRM_TURN
 
 ;NO_LEFT_TRN   NOP 
                             
 CONFIRM_TURN  JSR INIT_RIGHT_TRN
-              LDY $1
-              JSR del_50us
               MOVB #FWD,CRNT_STATE
               JSR INIT_FWD
               RTS
@@ -5939,7 +5942,7 @@ INIT_ALL_STP BCLR PTT,%00110000           ; Turn off the drive motors
             RTS
 *******************************************************************
 INIT_LEFT_TRN BSET PORTA,%00000001         ; Set REV dir. for STARBOARD (right) motor
-             ; BCLR PORTA,%00000010
+              BCLR PORTA,%00000010
            ; LDAA TOF_COUNTER              ; Mark the fwd_turn time Tfwdturn
            ; ADDA #LEFT_TRN_INT
            ; STAA T_LEFT_TRN

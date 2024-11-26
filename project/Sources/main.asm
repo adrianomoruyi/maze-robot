@@ -383,7 +383,7 @@ ADJUSTR     JSR INIT_RIGHT_TRN
             MOVB #FWD,CRNT_STATE 
             RTS
 
-JUNCTION1   LDY #9200
+JUNCTION1   LDY #7900
             JSR del_50us
             JSR INIT_LEFT_TRN        
             MOVB #LEFT_TRN,CRNT_STATE
@@ -401,10 +401,13 @@ JUNCTION2
             MOVB #FWD,CRNT_STATE 
             RTS       
 *******************************************************************
-REV_ST      LDAA SENSOR_BOW
-            SUBA THRESHOLD_BOW
-            SUBA DEFAULT_BOW
-            BPL REV_EXIT   ;MIGHT NEED TO CHANGE TO BMI!!!!!
+REV_ST     ; LDAA SENSOR_BOW
+           ; SUBA THRESHOLD_BOW
+           ; SUBA DEFAULT_BOW
+           LDY #23500
+           JSR del_50us
+           
+            ;BPL REV_EXIT   ;MIGHT NEED TO CHANGE TO BMI!!!!!
             
             BRA  CONFIRM_TURN
           
@@ -423,7 +426,7 @@ LEFT_TRN_ST
               ;SUBA THRESHOLD_BOW
               ;SUBA DEFAULT_BOW
               ;BPL  RIGHT_TRN_EXIT 
-               LDY $10000
+               LDY #13000
                JSR del_50us
               
               BRA CONFIRM_TURN
