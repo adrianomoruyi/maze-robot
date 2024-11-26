@@ -70,11 +70,11 @@ DEFAULT_PORT   FCB   $7D
 DEFAULT_MID    FCB   $CB
 DEFAULT_STBD   FCB   $7D
 
-THRESHOLD_LINE FCB $15
+THRESHOLD_LINE FCB $10
 THRESHOLD_BOW FCB $40
-THRESHOLD_PORT FCB $40
+THRESHOLD_PORT FCB $30
 THRESHOLD_MID FCB $85
-THRESHOLD_STBD FCB $40             
+THRESHOLD_STBD FCB $30             
              
 TOF_COUNTER   dc.b  0                       ; The timer, incremented at 23Hz
 CRNT_STATE    dc.b  3                       ; Current state register
@@ -285,7 +285,11 @@ NO_FWD_BUMP BRSET PORTAD0,$08,NO_REAR_BUMP ; If REAR_BUMP, then we should stop
             
 NO_REAR_BUMP
             
-            
+            ;JSR INIT_ALL_STP   ARTIFICIAL DELAY
+             
+            ; LDY #1500
+            ; JSR del_50us
+           ; JSR INIT_FWD
             
          
              
@@ -336,6 +340,8 @@ NO_REAR_BUMP
             ; ADDA UNCERTAIN_STBD
             ; CMPA DEFAULT_STBD
             ; BMI JUNCTION3
+            
+             
              
              JMP FWD_EXIT
              
@@ -386,6 +392,8 @@ ADJUSTR     JSR INIT_RIGHT_TRN
 JUNCTION1   LDY #7900
             JSR del_50us
             JSR INIT_LEFT_TRN        
+            
+            
             MOVB #LEFT_TRN,CRNT_STATE
             ;LDY #9200
             ;JSR del_50us
@@ -404,7 +412,7 @@ JUNCTION2
 REV_ST     ; LDAA SENSOR_BOW
            ; SUBA THRESHOLD_BOW
            ; SUBA DEFAULT_BOW
-           LDY #23500
+           LDY #22000
            JSR del_50us
            
             ;BPL REV_EXIT   ;MIGHT NEED TO CHANGE TO BMI!!!!!
@@ -426,7 +434,7 @@ LEFT_TRN_ST
               ;SUBA THRESHOLD_BOW
               ;SUBA DEFAULT_BOW
               ;BPL  RIGHT_TRN_EXIT 
-               LDY #13000
+               LDY #11500
                JSR del_50us
               
               BRA CONFIRM_TURN
