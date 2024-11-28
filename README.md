@@ -5,6 +5,6 @@ The eebot uses the HSC12 microcontroller to manage the logic of this project. Th
 
 ## Technologies used
 
-- HSC12 Assembly
+- HCS12 Assembly
 - CodeWarrior IDE
-- eebot Maze Robot (HSC12 microcontroller)
+- eebot Maze Robot (HCS12 microcontroller)
