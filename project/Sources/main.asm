@@ -68,13 +68,13 @@ DEFAULT_LINE   FCB   $70                   ;NOTE!!! DEFAULT VALUE OVER WHITESPAC
 DEFAULT_BOW    FCB   $CB                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE IS ABOUT 40 (give or take) 
 DEFAULT_PORT   FCB   $7D
 DEFAULT_MID    FCB   $CB
-DEFAULT_STBD   FCB   $40
+DEFAULT_STBD   FCB   $7D
 
-THRESHOLD_LINE FCB $15
+THRESHOLD_LINE FCB $10
 THRESHOLD_BOW FCB $40
-THRESHOLD_PORT FCB $40
+THRESHOLD_PORT FCB $30
 THRESHOLD_MID FCB $85
-THRESHOLD_STBD FCB $40             
+THRESHOLD_STBD FCB $30             
              
 TOF_COUNTER   dc.b  0                       ; The timer, incremented at 23Hz
 CRNT_STATE    dc.b  3                       ; Current state register
@@ -265,7 +265,7 @@ START_EXIT  RTS                                   ; return to the MAIN routine
 *******************************************************************
 FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
 
-            ;MOVB #REV_TRN,CRNT_STATE ; set the state to REVERSE
+            MOVB #REV,CRNT_STATE ; set the state to REVERSE
             ;JSR UPDT_DISPL
            ; JSR INIT_REV ; initialize the REVERSE routine
             
@@ -273,14 +273,8 @@ FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
            ; JSR del_50us
             JSR INIT_RIGHT_TRN
             
-            LDY #48080
+            LDY #12000
             JSR del_50us
-            
-            JSR LEFT_TRN_ST
-             
-            
-            JSR INIT_FWD
-            MOVB #FWD,CRNT_STATE ;
             
             JMP FWD_EXIT ; and return
             
@@ -291,7 +285,11 @@ NO_FWD_BUMP BRSET PORTAD0,$08,NO_REAR_BUMP ; If REAR_BUMP, then we should stop
             
 NO_REAR_BUMP
             
-            
+           JSR INIT_ALL_STP  ; ARTIFICIAL DELAY
+             
+            LDY #1500
+             JSR del_50us
+           JSR INIT_FWD
             
          
              
@@ -299,7 +297,18 @@ NO_REAR_BUMP
             SUBA THRESHOLD_BOW
             SUBA DEFAULT_BOW
             BMI CHECK_MID
+            ;BPL CHECK_PORT
             
+         ;   LDAA SENSOR_MID
+         ;   SUBA THRESHOLD_MID
+         ;   SUBA DEFAULT_MID
+         ;   BMI CHECK_PORT
+           
+            LDAA SENSOR_STBD
+            ADDA THRESHOLD_STBD
+            SUBA DEFAULT_STBD
+            BMI CHECK_PORT
+           
             
             
             
@@ -331,6 +340,8 @@ NO_REAR_BUMP
             ; ADDA UNCERTAIN_STBD
             ; CMPA DEFAULT_STBD
             ; BMI JUNCTION3
+            
+             
              
              JMP FWD_EXIT
              
@@ -350,6 +361,12 @@ CHECK_MID
             BMI CHECK_PORT
             RTS
 
+;CHECK_STBD  LDAA DEFAULT_STBD
+;            ADDA THRESHOLD_STBD
+;            SUBA SENSOR_STBD
+;            BMI CHECK_PORT
+;            RTS
+
 CHECK_PORT  LDAA DEFAULT_PORT
             ADDA THRESHOLD_PORT
             SUBA SENSOR_PORT
@@ -359,26 +376,28 @@ CHECK_PORT  LDAA DEFAULT_PORT
 
 ADJUSTL     
             JSR INIT_LEFT_TRN
-            LDY #1000
+            LDY #1200
             JSR del_50us
             JSR INIT_FWD
             MOVB #FWD,CRNT_STATE 
             RTS
             
 ADJUSTR     JSR INIT_RIGHT_TRN
-            LDY #1000
+            LDY #1200
             JSR del_50us
             JSR INIT_FWD
             MOVB #FWD,CRNT_STATE 
             RTS
 
-JUNCTION1   LDY #9200
+JUNCTION1   LDY #7900
             JSR del_50us
-            JSR INIT_LEFT_TRN
-           
+            JSR INIT_LEFT_TRN        
+            
+            
             MOVB #LEFT_TRN,CRNT_STATE
-            ;JSR LEFT_TRN 
-            RTS 
+            ;LDY #9200
+            ;JSR del_50us
+            JMP MAIN 
             
 JUNCTION2   
             LDY #7200
@@ -390,13 +409,16 @@ JUNCTION2
             MOVB #FWD,CRNT_STATE 
             RTS       
 *******************************************************************
-REV_ST      LDAA TOF_COUNTER   ; If Tc>Trev then
-            CMPA T_REV         ; the robot should make a FWD turn
-            BNE NO_REV_TRN     ; so
-            MOVB #REV_TRN,CRNT_STATE ; set state to REV_TRN
-        ;    JSR INIT_REV_TRN   ; initialize the REV_TRN state
-            MOVB #REV_TRN,CRNT_STATE ; set state to REV_TRN
-            BRA REV_EXIT       ; and return
+REV_ST     ; LDAA SENSOR_BOW
+           ; SUBA THRESHOLD_BOW
+           ; SUBA DEFAULT_BOW
+           LDY #23000
+           JSR del_50us
+           
+            ;BPL REV_EXIT   ;MIGHT NEED TO CHANGE TO BMI!!!!!
+            
+            BRA  CONFIRM_TURN
+          
 NO_REV_TRN  NOP                ; Else
 REV_EXIT    RTS                ; return to the MAIN routine
 *******************************************************************
@@ -408,15 +430,19 @@ NO_START    NOP                           ; Else
 ALL_STP_EXIT RTS                          ; return to the MAIN routine
 *******************************************************************
 LEFT_TRN_ST  
-              LDAA SENSOR_BOW
-              SUBA THRESHOLD_BOW
-              SUBA DEFAULT_BOW
-              BMI  CONFIRM_TURN
-              RTS
+              ;LDAA SENSOR_BOW
+              ;SUBA THRESHOLD_BOW
+              ;SUBA DEFAULT_BOW
+              ;BPL  RIGHT_TRN_EXIT 
+               LDY #13500
+               JSR del_50us
+              
+              BRA CONFIRM_TURN
 
 ;NO_LEFT_TRN   NOP 
                             
-CONFIRM_TURN  MOVB #FWD,CRNT_STATE
+CONFIRM_TURN  JSR INIT_RIGHT_TRN
+              MOVB #FWD,CRNT_STATE
               JSR INIT_FWD
               RTS
 
