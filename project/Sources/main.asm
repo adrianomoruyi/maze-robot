@@ -91,9 +91,7 @@ T_REV       ds.b 1 ; REV time
 T_LEFT_TRN   ds.b 1 ; LEFT_TURN time
 T_RIGHT_TRN   ds.b 1 ; RIGHT_TURN time
 T_REV_TRN   ds.b 1 ; REV_TURN time
-
-    
-             
+           
 ; ------------------------------------------------------ 
 ; Storage Registers (9S12C32 RAM space: $3800 ... $3FFF)
 ; ------------------------------------------------------
@@ -114,8 +112,6 @@ CLEAR_LINE    FCC   '                  '    ; Clear the line of display
               FCB   NULL                    ; terminated by null
 
 TEMP          RMB   1                       ; Temporary location
-
-
 
 ; code section
 ;***************************************************************************************************
@@ -143,33 +139,14 @@ _Startup:
               JSR cmd2LCD                                       
               LDX #msg2 ; Display msg2                           
               JSR putsLCD ; "     
-              JSR ENABLE_TOF ; Jump to TOF initialization --------
+              JSR ENABLE_TOF ; Jump to TOF initialization --------                
             
-               
-            
-MAIN          
-               JSR   G_LEDS_ON              ; Enable the guider LEDs
-               JSR   READ_SENSORS
-               
-               JSR   G_LEDS_OFF  
-               
-               
+MAIN          JSR   G_LEDS_ON            
+              JSR   READ_SENSORS
+              JSR   G_LEDS_OFF  
               JSR   UPDT_DISPL
               LDAA  CRNT_STATE                 
               JSR   DISPATCHER 
-               
-               
-               
-                          ; Read the 5 guider sensor
-              
-                         ; Disable the guider LEDs  
-               
-              ; JSR   DISPLAY_SENSORS        ; and write them to the LCD
-               
-              ; LDY   #6000                  ; 300 ms delay to avoid
-              ; JSR   del_50us               ; display artifacts
-
-                           
               BRA   MAIN                   ; Loop forever
 
 ; data section
@@ -188,194 +165,103 @@ tab         dc.b "START   ",0
     
 ;***************************************************************************************************
 
-DISPATCHER  CMPA #START       ; If it’s the START state -----------------
-            BNE NOT_START     ;                                          |
-            JSR START_ST      ; then call START_ST routine               D
-            BRA DISP_EXIT     ; and exit                                 I
-                              ;                                          S
-NOT_START   CMPA #FWD         ; 
-            BNE NOT_FWD       ;                                          
-            JSR FWD_ST        ; 
-            BRA DISP_EXIT     ; 
+DISPATCHER   CMPA #START       ; 
+             BNE NOT_START     ;                                        
+             JSR START_ST      ; 
+             BRA DISP_EXIT     ; 
+                              ;                                          
+NOT_START    CMPA #FWD         ; 
+             BNE NOT_FWD       ;                                          
+             JSR FWD_ST        ; 
+             BRA DISP_EXIT     ; 
             
-NOT_FWD     CMPA #REV         ; 
-            BNE NOT_REV       ;                                          
-            JSR REV_ST        ; 
-            BRA DISP_EXIT     ; 
+NOT_FWD      CMPA #REV         ; 
+             BNE NOT_REV       ;                                          
+             JSR REV_ST        ; 
+             BRA DISP_EXIT     ; 
             
-NOT_REV     CMPA #ALL_STP     ; 
-            BNE NOT_ALL_STP   ;                                          
-            JSR ALL_STP_ST    ; 
-            BRA DISP_EXIT     ; 
+NOT_REV      CMPA #ALL_STP     ; 
+             BNE NOT_ALL_STP   ;                                          
+             JSR ALL_STP_ST    ; 
+             BRA DISP_EXIT     ; 
             
-NOT_ALL_STP CMPA #LEFT_TRN     ; 
-            BNE NOT_LEFT_TRN   ;                                          
-            JSR LEFT_TRN_ST    ; 
-            BRA DISP_EXIT     ; 
-                              ;                                                                                      
-NOT_LEFT_TRN CMPA #RIGHT_TRN     ; Else if it’s the REV_TRN state           C
-            BNE NOT_RIGHT_TRN   ;                                          H
-            JSR RIGHT_TRN_ST    ; then call REV_TRN_ST routine             E
-            BRA DISP_EXIT     ; and exit                                 R
-            
-NOT_RIGHT_TRN CMPA #LEFT_ALIGN     ; Else if it’s the REV_TRN state           C
-            BNE NOT_LEFT_ALIGN   ;                                          H
-         ;   JSR LEFT_ALIGN_ST    ; then call REV_TRN_ST routine             E
-            BRA DISP_EXIT     ; and exit                                 R
-            
-                        
-NOT_LEFT_ALIGN CMPA #RIGHT_ALIGN     ; Else if it’s the REV_TRN state           C
-            BNE NOT_RIGHT_ALIGN   ;                                          H
-         ;   JSR RIGHT_ALIGN_ST    ; then call REV_TRN_ST routine             E
-            BRA DISP_EXIT     ; and exit                                 R
-            
-                        
-NOT_RIGHT_ALIGN CMPA #REV_TRN     ; Else if it’s the REV_TRN state           C
-            BNE NOT_REV_TRN   ;                                          H
-            JSR REV_TRN_ST    ; then call REV_TRN_ST routine             E
-            BRA DISP_EXIT     ; and exit                                 R
-                              ;                                          |
-NOT_REV_TRN SWI               ; Else the CRNT_ST is not defined, so stop |
-DISP_EXIT   RTS               ; Exit from the state dispatcher ----------
+NOT_ALL_STP  CMPA #LEFT_TRN    ; 
+             BNE NOT_LEFT_TRN  ;                                          
+             JSR LEFT_TRN_ST   ; 
+             BRA DISP_EXIT     ; 
+                                                                                                                 
+NOT_LEFT_TRN CMPA #RIGHT_TRN  ;
+             BNE NOT_RIGHT_TRN ;                                          
+             JSR RIGHT_TRN_ST  ; 
+             BRA DISP_EXIT     ; 
+
+NOT_RIGHT_TRN SWI             ; Else the CRNT_ST is not defined, so stop |
+DISP_EXIT    RTS               ; Exit from the state dispatcher ----------
 
 *******************************************************************
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-*******************************************************************
-START_ST    BRCLR PORTAD0,$04,NO_FWD          ; If /FWD_BUMP
-            JSR INIT_FWD                          ; Initialize the FORWARD state
-            MOVB #FWD,CRNT_STATE           ; Go into the FORWARD state
-            BRA START_EXIT
-NO_FWD      NOP                                   ; Else
-START_EXIT  RTS                                   ; return to the MAIN routine
+START_ST     BRCLR PORTAD0,$04,NO_FWD          ; If /FWD_BUMP
+             JSR INIT_FWD                      ; Initialize the FORWARD state
+             MOVB #FWD,CRNT_STATE              ; Go into the FORWARD state
+             BRA START_EXIT
+NO_FWD       NOP                               ; Else
+START_EXIT   RTS                               ; return to the MAIN routine
                                  
 *******************************************************************
-FWD_ST      BRSET PORTAD0,$04,NO_FWD_BUMP ; If FWD_BUMP then
-
-            MOVB #REV,CRNT_STATE ; set the state to REVERSE
-            ;JSR UPDT_DISPL
-           ; JSR INIT_REV ; initialize the REVERSE routine
-            
-           ; LDY #6000
-           ; JSR del_50us
-            JSR INIT_RIGHT_TRN
-            
-            LDY #12000
-            JSR del_50us
-            
-            JMP FWD_EXIT ; and return
-            
-NO_FWD_BUMP BRSET PORTAD0,$08,NO_REAR_BUMP ; If REAR_BUMP, then we should stop
-            MOVB #ALL_STP,CRNT_STATE ; and change state to ALL_STOP
-            JSR INIT_ALL_STP ; so initialize the ALL_STOP state
-            JMP FWD_EXIT ; and return
-            
-NO_REAR_BUMP
-            
-           JSR INIT_ALL_STP  ; ARTIFICIAL DELAY
-             
-            LDY #1500
-             JSR del_50us
-           JSR INIT_FWD
-            
-         
-             
-            LDAA SENSOR_BOW
-            SUBA THRESHOLD_BOW
-            SUBA DEFAULT_BOW
-            BMI CHECK_MID
-            ;BPL CHECK_PORT
-            
-         ;   LDAA SENSOR_MID
-         ;   SUBA THRESHOLD_MID
-         ;   SUBA DEFAULT_MID
-         ;   BMI CHECK_PORT
-           
-            LDAA SENSOR_STBD
-            ADDA THRESHOLD_STBD
-            SUBA DEFAULT_STBD
-            BMI CHECK_PORT
-           
-            
-            
-            
-            
-            LDAA SENSOR_LINE      ;Load the sensor reading into A
-            SUBA DEFAULT_LINE     ;Subtract the default value for the sensor
-            SUBA THRESHOLD_LINE   ;Subtract the threshold value
-            BPL ADJUSTR           ;If the result is positive, that means the sensor reading increased (past
-                                  ;the threshold) and the bot must adjust to the right 
-                                  
-            LDAA SENSOR_LINE      ;Load the sensor reading into A           
-            ADDA DEFAULT_LINE
-            ADDA THRESHOLD_LINE      ;Subtract the default value for the sensor
-            BMI ADJUSTL           ;If the result is negative, that means the sensor reading decreased (past
-                                  ;the threshold) and the bot must adjust to the left
-            
-            
-            
-            
-            
-            
-            ; LDAA SENSOR_BOW
-            ; ADDA UNCERTAIN_BOW
-            ; CMPA DEFAULT_BOW
-            ; BPL JUNCTION1
-             
-            
-            ; LDAA SENSOR_STBD
-            ; ADDA UNCERTAIN_STBD
-            ; CMPA DEFAULT_STBD
-            ; BMI JUNCTION3
-            
-             
-             
+FWD_ST       BRSET PORTAD0,$04,NO_FWD_BUMP     ; If FWD_BUMP, do a 180 turn
+             MOVB #REV,CRNT_STATE 
+             JSR INIT_RIGHT_TRN           
+             LDY #12000
+             JSR del_50us            
              JMP FWD_EXIT
-             
-             
-;             JSR INIT_LEFT_TRN ; initialize the FORWARD_TURN state
-;             MOVB #LEFT_TRN,CRNT_STATE ; and go to that state
-;             JMP FWD_EXIT
+            
+NO_FWD_BUMP  BRSET PORTAD0,$08,NO_REAR_BUMP    ; If REAR_BUMP, then we should stop
+             MOVB #ALL_STP,CRNT_STATE
+             JSR INIT_ALL_STP
+             JMP FWD_EXIT 
+            
+NO_REAR_BUMP JSR INIT_ALL_STP  ; ARTIFICIAL DELAY (to make eebot run slower)       
+             LDY #1500
+             JSR del_50us
+             JSR INIT_FWD
 
+             LDAA SENSOR_BOW   ; Check if bow is on the black line, if so check mid
+             SUBA THRESHOLD_BOW
+             SUBA DEFAULT_BOW
+             BMI CHECK_MID
+             
+             LDAA SENSOR_STBD  ; Check of starboard is on the black line, if so check port
+             ADDA THRESHOLD_STBD
+             SUBA DEFAULT_STBD
+             BMI CHECK_PORT
+               
+             LDAA SENSOR_LINE  ; Check line sensors for both sides for constant adjustments.     
+             SUBA DEFAULT_LINE     
+             SUBA THRESHOLD_LINE   
+             BPL ADJUSTR           
+                              
+             LDAA SENSOR_LINE               
+             ADDA DEFAULT_LINE
+             ADDA THRESHOLD_LINE    
+             BMI ADJUSTL         
+
+             JMP FWD_EXIT
 
 NO_FWD_TRN  NOP                ; Else
 FWD_EXIT    RTS                ; return to the MAIN routine
 *******************************************************************
-CHECK_MID
-            LDAA DEFAULT_MID
+CHECK_MID   LDAA DEFAULT_MID   ; Check if mid is on the black line, if so check port 
             ADDA THRESHOLD_MID
             SUBA SENSOR_MID
             BMI CHECK_PORT
             RTS
 
-;CHECK_STBD  LDAA DEFAULT_STBD
-;            ADDA THRESHOLD_STBD
-;            SUBA SENSOR_STBD
-;            BMI CHECK_PORT
-;            RTS
-
-CHECK_PORT  LDAA DEFAULT_PORT
+CHECK_PORT  LDAA DEFAULT_PORT  ; Check if port is on the black line, if so do the junction turn
             ADDA THRESHOLD_PORT
             SUBA SENSOR_PORT
             BMI JUNCTION1
             RTS
 
-
-ADJUSTL     
-            JSR INIT_LEFT_TRN
+ADJUSTL     JSR INIT_LEFT_TRN
             LDY #1200
             JSR del_50us
             JSR INIT_FWD
@@ -391,137 +277,79 @@ ADJUSTR     JSR INIT_RIGHT_TRN
 
 JUNCTION1   LDY #7900
             JSR del_50us
-            JSR INIT_LEFT_TRN        
-            
-            
+            JSR INIT_LEFT_TRN                  
             MOVB #LEFT_TRN,CRNT_STATE
-            ;LDY #9200
-            ;JSR del_50us
             JMP MAIN 
-            
-JUNCTION2   
-            LDY #7200
-            JSR del_50us
-            JSR INIT_LEFT_TRN
-            LDY #13050
-            JSR del_50us
-            JSR INIT_FWD
-            MOVB #FWD,CRNT_STATE 
-            RTS       
+    
 *******************************************************************
-REV_ST     ; LDAA SENSOR_BOW
-           ; SUBA THRESHOLD_BOW
-           ; SUBA DEFAULT_BOW
-           LDY #23000
-           JSR del_50us
-           
-            ;BPL REV_EXIT   ;MIGHT NEED TO CHANGE TO BMI!!!!!
-            
-            BRA  CONFIRM_TURN
-          
-NO_REV_TRN  NOP                ; Else
-REV_EXIT    RTS                ; return to the MAIN routine
-*******************************************************************
-ALL_STP_ST  BRSET PORTAD0,$04,NO_START    ; If FWD_BUMP
-            BCLR PTT,%00110000            ; initialize the START state (both motors off)
-            MOVB #START,CRNT_STATE        ; set the state to START
-            BRA ALL_STP_EXIT              ; and return
-NO_START    NOP                           ; Else
-ALL_STP_EXIT RTS                          ; return to the MAIN routine
-*******************************************************************
-LEFT_TRN_ST  
-              ;LDAA SENSOR_BOW
-              ;SUBA THRESHOLD_BOW
-              ;SUBA DEFAULT_BOW
-              ;BPL  RIGHT_TRN_EXIT 
-               LDY #13500
-               JSR del_50us
-              
-              BRA CONFIRM_TURN
+REV_ST       LDY #23000
+             JSR del_50us
+             BRA  CONFIRM_TURN
+NO_REV_TRN   NOP                ; Else
+REV_EXIT     RTS                ; return to the MAIN routine
 
-;NO_LEFT_TRN   NOP 
-                            
+*******************************************************************
+ALL_STP_ST   BRSET PORTAD0,$04,NO_START    ; If FWD_BUMP
+             BCLR PTT,%00110000            ; initialize the START state (both motors off)
+             MOVB #START,CRNT_STATE        ; set the state to START
+             BRA ALL_STP_EXIT              ; and return
+NO_START     NOP                           ; Else
+ALL_STP_EXIT RTS                          ; return to the MAIN routine
+
+*******************************************************************
+LEFT_TRN_ST   LDY #13500
+              JSR del_50us
+              BRA CONFIRM_TURN
+             
+*******************************************************************         
 CONFIRM_TURN  JSR INIT_RIGHT_TRN
               MOVB #FWD,CRNT_STATE
               JSR INIT_FWD
               RTS
-
-
+              
 *******************************************************************
-RIGHT_TRN_ST  LDAA TOF_COUNTER              ; If Tc>Tfwdturn then
-            CMPA T_RIGHT_TRN                ; the robot should go FWD
-            BNE NO_RIGHT_TURN                 ; so
-            JSR INIT_FWD                  ; initialize the FWD state
-            MOVB #FWD,CRNT_STATE          ; set state to FWD
-            BRA RIGHT_TRN_EXIT              ; and return
-NO_RIGHT_TURN   NOP                             ; Else
+RIGHT_TRN_ST  LDY #13500
+              JSR del_50us
+              BRA CONFIRM_TURN
 RIGHT_TRN_EXIT RTS
-*******************************************************************
-REV_TRN_ST LDAA TOF_COUNTER               ; If Tc>Trevturn then
-            CMPA T_REV_TRN                ; the robot should go FWD
-            BNE NO_FWD_RT                 ; so
-            MOVB #FWD,CRNT_STATE          ; set state to FWD
-            JSR INIT_FWD                  ; initialize the FWD state
-            MOVB #FWD,CRNT_STATE          ; set state to FWD
-            BRA REV_TRN_EXIT              ; and return
-NO_FWD_RT NOP                             ; Else
-REV_TRN_EXIT RTS                          ; return to the MAIN routine
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 *******************************************************************
-INIT_FWD    BCLR PORTA,%00000011          ; Set FWD direction for both motors
-            BSET PTT,%00110000            ; Turn on the drive motors
-            ;LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
-            ;ADDA #FWD_INT
-            ;STAA T_FWD
-            RTS
+REV_TRN_ST     LDAA TOF_COUNTER              ; If Tc>Trevturn then
+               CMPA T_REV_TRN                ; the robot should go FWD
+               BNE NO_FWD_RT                 ; so
+               MOVB #FWD,CRNT_STATE          ; set state to FWD
+               JSR INIT_FWD                  ; initialize the FWD state
+               MOVB #FWD,CRNT_STATE          ; set state to FWD
+               BRA REV_TRN_EXIT              ; and return
+NO_FWD_RT      NOP                           ; Else
+REV_TRN_EXIT   RTS                           ; return to the MAIN routine
+
 *******************************************************************
-INIT_REV    BSET PORTA,%00000011          ; Set REV direction for both motors
-            BSET PTT,%00110000            ; Turn on the drive motors
-            LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
-            ADDA #REV_INT
-            STAA T_REV
-            RTS
+INIT_FWD       BCLR PORTA,%00000011          ; Set FWD direction for both motors
+               BSET PTT,%00110000            ; Turn on the drive motors
+               RTS
+               
 *******************************************************************
-INIT_ALL_STP BCLR PTT,%00110000           ; Turn off the drive motors
-            RTS
+INIT_REV       BSET PORTA,%00000011          ; Set REV direction for both motors
+               BSET PTT,%00110000            ; Turn on the drive motors
+               LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
+               ADDA #REV_INT
+               STAA T_REV
+               RTS
+               
 *******************************************************************
-INIT_LEFT_TRN BSET PORTA,%00000001         ; Set REV dir. for STARBOARD (right) motor
-              BCLR PORTA,%00000010
-           ; LDAA TOF_COUNTER              ; Mark the fwd_turn time Tfwdturn
-           ; ADDA #LEFT_TRN_INT
-           ; STAA T_LEFT_TRN
-            RTS
+INIT_ALL_STP   BCLR PTT,%00110000           ; Turn off the drive motors
+               RTS
+            
+*******************************************************************
+INIT_LEFT_TRN  BSET PORTA,%00000001         ; Set REV dir. for STARBOARD (right) motor
+               BCLR PORTA,%00000010
+               RTS
+               
 *******************************************************************
 INIT_RIGHT_TRN BSET PORTA,%00000010         ; Set FWD dir. for STARBOARD (right) motor
                BCLR PORTA,%00000001
-           ; LDAA TOF_COUNTER              ; Mark the fwd time Tfwd
-           ; ADDA #RIGHT_TRN_INT
-           ; STAA T_RIGHT_TRN
-            RTS
-
-
-
-
-
-
-
-
-
-
-
+               RTS
 
 ; utility subroutines
 *******************************************************************
@@ -935,8 +763,6 @@ C_UNITS    LDAA UNITS     ;No blank check necessary, convert to ascii.
            STAA UNITS
 *
            RTS            ;We're done
-           
-           
            
 ************************************************************
 ENABLE_TOF  LDAA #%10000000
