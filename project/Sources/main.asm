@@ -64,8 +64,8 @@ SPACE         EQU   ' '                   ; The 'space' character
 ; ---------------------
               ORG   $3800
              
-DEFAULT_LINE   FCB   $70                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE SHOULD BE ABOUT THE SAME
-DEFAULT_BOW    FCB   $CB                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE IS ABOUT 40 (give or take) 
+DEFAULT_LINE   FCB   $70                   
+DEFAULT_BOW    FCB   $CB                   ;NOTE!!! DEFAULT VALUE OVER WHITESPACE IS ABOUT $40
 DEFAULT_PORT   FCB   $7D
 DEFAULT_MID    FCB   $CB
 DEFAULT_STBD   FCB   $7D
@@ -128,18 +128,18 @@ _Startup:
               JSR   initLCD                ; Initialize the LCD
               JSR   CLR_LCD_BUF            ; Write 'space' characters to the LCD buffer 
               
-              BSET DDRA,%00000011 ; STAR_DIR, PORT_DIR            
-              BSET DDRT,%00110000 ; STAR_SPEED, PORT_SPEED 
-              JSR initAD ; Initialize ATD converter
-              JSR clrLCD ; Clear LCD & home cursor                
+              BSET DDRA,%00000011          ; STAR_DIR, PORT_DIR            
+              BSET DDRT,%00110000          ; STAR_SPEED, PORT_SPEED 
+              JSR initAD                   ; Initialize ATD converter
+              JSR clrLCD                   ; Clear LCD & home cursor                
               
-              LDX #msg1 ; Display msg1                            
-              JSR putsLCD ; "                                                                             
-              LDAA #$C0 ; Move LCD cursor to the 2nd row         
+              LDX #msg1                    ; Display msg1                            
+              JSR putsLCD                  ; "                                                                             
+              LDAA #$C0                    ; Move LCD cursor to the 2nd row         
               JSR cmd2LCD                                       
-              LDX #msg2 ; Display msg2                           
-              JSR putsLCD ; "     
-              JSR ENABLE_TOF ; Jump to TOF initialization --------                
+              LDX #msg2                    ; Display msg2                           
+              JSR putsLCD                  ; "     
+              JSR ENABLE_TOF               ; Jump to TOF initialization --------                
             
 MAIN          JSR   G_LEDS_ON            
               JSR   READ_SENSORS
@@ -169,7 +169,7 @@ DISPATCHER   CMPA #START       ;
              BNE NOT_START     ;                                        
              JSR START_ST      ; 
              BRA DISP_EXIT     ; 
-                              ;                                          
+                                                                        
 NOT_START    CMPA #FWD         ; 
              BNE NOT_FWD       ;                                          
              JSR FWD_ST        ; 
@@ -190,12 +190,12 @@ NOT_ALL_STP  CMPA #LEFT_TRN    ;
              JSR LEFT_TRN_ST   ; 
              BRA DISP_EXIT     ; 
                                                                                                                  
-NOT_LEFT_TRN CMPA #RIGHT_TRN  ;
+NOT_LEFT_TRN CMPA #RIGHT_TRN   ;
              BNE NOT_RIGHT_TRN ;                                          
              JSR RIGHT_TRN_ST  ; 
              BRA DISP_EXIT     ; 
 
-NOT_RIGHT_TRN SWI             ; Else the CRNT_ST is not defined, so stop |
+NOT_RIGHT_TRN SWI              ; Else the CRNT_ST is not defined, so stop |
 DISP_EXIT    RTS               ; Exit from the state dispatcher ----------
 
 *******************************************************************
@@ -219,74 +219,74 @@ NO_FWD_BUMP  BRSET PORTAD0,$08,NO_REAR_BUMP    ; If REAR_BUMP, then we should st
              JSR INIT_ALL_STP
              JMP FWD_EXIT 
             
-NO_REAR_BUMP JSR INIT_ALL_STP  ; ARTIFICIAL DELAY (to make eebot run slower)       
+NO_REAR_BUMP JSR INIT_ALL_STP                  ; ARTIFICIAL DELAY (to make eebot run slower)       
              LDY #1500
              JSR del_50us
              JSR INIT_FWD
 
-             LDAA SENSOR_BOW   ; Check if bow is on the black line, if so check mid
+             LDAA SENSOR_BOW                   ; Check if bow is on the black line, if so check mid
              SUBA THRESHOLD_BOW
              SUBA DEFAULT_BOW
              BMI CHECK_MID
              
-             LDAA SENSOR_STBD  ; Check of starboard is on the black line, if so check port
+             LDAA SENSOR_STBD                  ; Check of starboard is on the black line, if so check port
              ADDA THRESHOLD_STBD
              SUBA DEFAULT_STBD
              BMI CHECK_PORT
                
-             LDAA SENSOR_LINE  ; Check line sensors for both sides for constant adjustments.     
+             LDAA SENSOR_LINE                  ; Check line sensors for the left side for constant adjustments.     
              SUBA DEFAULT_LINE     
              SUBA THRESHOLD_LINE   
              BPL ADJUSTR           
                               
-             LDAA SENSOR_LINE               
+             LDAA SENSOR_LINE                  ; Check line sensors for the right side for constant adjustments     
              ADDA DEFAULT_LINE
              ADDA THRESHOLD_LINE    
              BMI ADJUSTL         
 
              JMP FWD_EXIT
 
-NO_FWD_TRN  NOP                ; Else
-FWD_EXIT    RTS                ; return to the MAIN routine
+NO_FWD_TRN  NOP                               ; Else
+FWD_EXIT    RTS                               ; return to the MAIN routine
 *******************************************************************
-CHECK_MID   LDAA DEFAULT_MID   ; Check if mid is on the black line, if so check port 
+CHECK_MID   LDAA DEFAULT_MID                  ; Check if mid is on the black line, if so check port 
             ADDA THRESHOLD_MID
             SUBA SENSOR_MID
             BMI CHECK_PORT
             RTS
 
-CHECK_PORT  LDAA DEFAULT_PORT  ; Check if port is on the black line, if so do the junction turn
+CHECK_PORT  LDAA DEFAULT_PORT                 ; Check if port is on the black line, if so do the junction turn
             ADDA THRESHOLD_PORT
             SUBA SENSOR_PORT
             BMI JUNCTION1
             RTS
 
-ADJUSTL     JSR INIT_LEFT_TRN
+ADJUSTL     JSR INIT_LEFT_TRN                 ; Adjust the eebot with very minute left turns 
             LDY #1200
             JSR del_50us
             JSR INIT_FWD
             MOVB #FWD,CRNT_STATE 
             RTS
             
-ADJUSTR     JSR INIT_RIGHT_TRN
+ADJUSTR     JSR INIT_RIGHT_TRN                ; Adjust the eebot with very minute right turns 
             LDY #1200
             JSR del_50us
             JSR INIT_FWD
             MOVB #FWD,CRNT_STATE 
             RTS
 
-JUNCTION1   LDY #7900
+JUNCTION1   LDY #7900                        ; Logic for making left turns at all junctions (except right turn junctions where it goes straight)
             JSR del_50us
             JSR INIT_LEFT_TRN                  
             MOVB #LEFT_TRN,CRNT_STATE
             JMP MAIN 
     
 *******************************************************************
-REV_ST       LDY #23000
+REV_ST       LDY #23000                    ; Delay to make the eebot do a 180 turn
              JSR del_50us
              BRA  CONFIRM_TURN
-NO_REV_TRN   NOP                ; Else
-REV_EXIT     RTS                ; return to the MAIN routine
+NO_REV_TRN   NOP                           ; Else
+REV_EXIT     RTS                           ; return to the MAIN routine
 
 *******************************************************************
 ALL_STP_ST   BRSET PORTAD0,$04,NO_START    ; If FWD_BUMP
@@ -294,21 +294,21 @@ ALL_STP_ST   BRSET PORTAD0,$04,NO_START    ; If FWD_BUMP
              MOVB #START,CRNT_STATE        ; set the state to START
              BRA ALL_STP_EXIT              ; and return
 NO_START     NOP                           ; Else
-ALL_STP_EXIT RTS                          ; return to the MAIN routine
+ALL_STP_EXIT RTS                           ; return to the MAIN routine
 
 *******************************************************************
-LEFT_TRN_ST   LDY #13500
+LEFT_TRN_ST   LDY #13500                   ; Delay to make the eebot do a 90 turn
               JSR del_50us
               BRA CONFIRM_TURN
              
 *******************************************************************         
-CONFIRM_TURN  JSR INIT_RIGHT_TRN
+CONFIRM_TURN  JSR INIT_RIGHT_TRN           ; Confirming a turn has been completed and moving back to forward state
               MOVB #FWD,CRNT_STATE
               JSR INIT_FWD
               RTS
               
 *******************************************************************
-RIGHT_TRN_ST  LDY #13500
+RIGHT_TRN_ST  LDY #13500                   ; Delay to make the eebot do a 90 turn
               JSR del_50us
               BRA CONFIRM_TURN
 RIGHT_TRN_EXIT RTS
@@ -338,16 +338,16 @@ INIT_REV       BSET PORTA,%00000011          ; Set REV direction for both motors
                RTS
                
 *******************************************************************
-INIT_ALL_STP   BCLR PTT,%00110000           ; Turn off the drive motors
+INIT_ALL_STP   BCLR PTT,%00110000            ; Turn off the drive motors
                RTS
             
 *******************************************************************
-INIT_LEFT_TRN  BSET PORTA,%00000001         ; Set REV dir. for STARBOARD (right) motor
+INIT_LEFT_TRN  BSET PORTA,%00000001          ; Set REV dir. for STARBOARD (right) motor
                BCLR PORTA,%00000010
                RTS
                
 *******************************************************************
-INIT_RIGHT_TRN BSET PORTA,%00000010         ; Set FWD dir. for STARBOARD (right) motor
+INIT_RIGHT_TRN BSET PORTA,%00000010          ; Set FWD dir. for STARBOARD (right) motor
                BCLR PORTA,%00000001
                RTS
 
