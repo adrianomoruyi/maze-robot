@@ -8,3 +8,5 @@ The eebot uses the HSC12 microcontroller to manage the logic of this project. Th
 - HCS12 Assembly
 - CodeWarrior IDE
 - eebot Maze Robot (HCS12 microcontroller)
+
+<img align="left" src="https://github.com/adrianomoruyi/maze-robot/blob/main/IMG_4594.jpg" width="620" />
